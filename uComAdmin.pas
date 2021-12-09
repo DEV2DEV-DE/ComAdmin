@@ -5,13 +5,15 @@ unit uComAdmin;
 interface
 
 uses
-  System.SysUtils,
   System.Generics.Collections,
+  System.SysUtils,
   COMAdmin_TLB;
 
 type
+  // forward declaration of internally used classes
   TComAdminBaseList = class;
 
+  // generic base class for all single objects
   TComAdminBaseObject = class(TObject)
   private
     FCatalogObject: ICatalogObject;
@@ -26,6 +28,7 @@ type
     property Descrition: string read FDescription write FDescription;
   end;
 
+  // generic list class for all collections of objects
   TComAdminBaseList = class(TObjectList<TComAdminBaseObject>)
   strict private
     FCatalogCollection: ICatalogCollection;
@@ -60,7 +63,7 @@ type
     property Items[Index: Integer]: TComAdminRole read GetItem; default;
   end;
 
-  TComAdminInstance = class(TObject)
+  TComAdminInstance = class(TComAdminBaseObject)
   private
     FProcessID: Cardinal;
     FHasRecycled: Boolean;
@@ -71,7 +74,7 @@ type
     property ProcessID: Cardinal read FProcessID;
   end;
 
-  TComAdminInstanceList = class(TObjectList<TComAdminInstance>);
+  TComAdminInstanceList = class(TComAdminBaseList);
 
   TComAdminApplication = class(TComAdminBaseObject)
   strict private
@@ -140,7 +143,8 @@ begin
   inherited Create;
   FCatalogObject := ACatalogObject;
   FCatalogCollection := ACollection.CatalogCollection;
-  if FCatalogCollection.Name <> COLLECTION_NAME_USERS then // Die User-Objekte enthalten keine Beschreibung
+  if (FCatalogCollection.Name <> COLLECTION_NAME_USERS) and
+     (FCatalogCollection.Name <> COLLECTION_NAME_INSTANCES)  then // some objects do not contain a description
     FDescription := VarToStrDef(FCatalogObject.Value[PROPERTY_NAME_DESCRIPTION], '');
   FKey := FCatalogObject.Key;
   FName := FCatalogObject.Name;
@@ -198,7 +202,7 @@ constructor TComAdminApplication.Create(ACollection: TComAdminBaseList; ACatalog
 begin
   inherited Create(ACollection, ACatalogObject);
   FRoles := TComAdminRoleList.Create(ACollection.CatalogCollection.GetCollection(COLLECTION_NAME_ROLES, FKey) as ICatalogCollection);
-  FInstances := TComAdminInstanceList.Create;
+  FInstances := TComAdminInstanceList.Create(ACollection.CatalogCollection.GetCollection(COLLECTION_NAME_INSTANCES, FKey) as ICatalogCollection);
   GetRoles;
 end;
 
@@ -220,7 +224,7 @@ begin
   Collection.Populate;
   for i := 0 to Collection.Count - 1 do
   begin
-    Instance := TComAdminInstance.Create;
+    Instance := TComAdminInstance.Create(FInstances, Collection.Item[i] as ICatalogObject);
     Instance.FHasRecycled := (Collection.Item[i] as ICatalogObject).Value[PROPERTY_NAME_RECYCLED];
     Instance.FIsPaused := (Collection.Item[i] as ICatalogObject).Value[PROPERTY_NAME_PAUSED];
     Instance.FProcessID := VarAsType((Collection.Item[i] as ICatalogObject).Value[PROPERTY_NAME_PROCESSID], varLongWord);
@@ -240,12 +244,12 @@ end;
 procedure TComAdminApplication.Shutdown;
 var
   ProcessHandle: THandle;
-  Instance: TComAdminInstance;
+  Instance: TComAdminBaseObject;
 begin
   GetInstances;
   for Instance in FInstances do
   begin
-    ProcessHandle := OpenProcess(PROCESS_TERMINATE, False, Instance.FProcessID);
+    ProcessHandle := OpenProcess(PROCESS_TERMINATE, False, (Instance as TComAdminInstance).FProcessID);
     TerminateProcess(ProcessHandle, 0);
   end;
 end;
