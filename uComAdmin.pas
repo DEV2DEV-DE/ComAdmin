@@ -27,7 +27,7 @@ type
   end;
 
   TComAdminBaseList = class(TObjectList<TComAdminBaseObject>)
-  private
+  strict private
     FCatalogCollection: ICatalogCollection;
   public
     constructor Create(ACatalogCollection: ICatalogCollection); reintroduce;
@@ -37,14 +37,14 @@ type
   TComAdminUser = class(TComAdminBaseObject);
 
   TComAdminUserList = class(TComAdminBaseList)
-  private
+  strict private
     function GetItem(Index: Integer): TComAdminUser;
   public
     property Items[Index: Integer]: TComAdminUser read GetItem; default;
   end;
 
   TComAdminRole = class(TComAdminBaseObject)
-  private
+  strict private
     FUsers: TComAdminUserList;
     procedure GetUsers;
   public
@@ -54,24 +54,41 @@ type
   end;
 
   TComAdminRoleList = class(TComAdminBaseList)
-  private
+  strict private
     function GetItem(Index: Integer): TComAdminRole;
   public
     property Items[Index: Integer]: TComAdminRole read GetItem; default;
   end;
 
-  TComAdminApplication = class(TComAdminBaseObject)
+  TComAdminInstance = class(TObject)
   private
+    FProcessID: Cardinal;
+    FHasRecycled: Boolean;
+    FIsPaused: Boolean;
+  public
+    property HasRecycled: Boolean read FHasRecycled;
+    property IsPaused: Boolean read FIsPaused;
+    property ProcessID: Cardinal read FProcessID;
+  end;
+
+  TComAdminInstanceList = class(TObjectList<TComAdminInstance>);
+
+  TComAdminApplication = class(TComAdminBaseObject)
+  strict private
     FRoles: TComAdminRoleList;
+    FInstances: TComAdminInstanceList;
     procedure GetRoles;
   public
     constructor Create(ACollection: TComAdminBaseList; ACatalogObject: ICatalogObject); reintroduce;
     destructor Destroy; override;
+    function GetInstances: TComAdminInstanceList;
+    procedure Shutdown;
     property Roles: TComAdminRoleList read FRoles;
+    property Instances: TComAdminInstanceList read FInstances;
   end;
 
   TComAdminApplicationList = class(TComAdminBaseList)
-  private
+  strict private
     function GetItem(Index: Integer): TComAdminApplication;
   public
     function Find(const AName: string; var AApplication: TComAdminApplication): Boolean;
@@ -79,11 +96,12 @@ type
   end;
 
   TComAdminCatalog = class(TObject)
-  private
+  strict private
     FCatalog: ICOMAdminCatalog2;
     FApplications: TComAdminApplicationList;
     FFilter: string;
     procedure GetApplications;
+    procedure SetFilter(const Value: string);
   public
     constructor Create(const AServer: string); reintroduce;
     destructor Destroy; override;
@@ -91,7 +109,7 @@ type
     procedure ExportApplicationByKey(const AKey, AFilename: string);
     procedure ExportApplicationByName(const AName, AFilename: string);
     property Applications: TComAdminApplicationList read FApplications;
-    property Filter: string read FFilter write FFilter;
+    property Filter: string read FFilter write SetFilter;
   end;
 
   EItemNotFound = Exception;
@@ -107,8 +125,12 @@ const
   COLLECTION_NAME_APPS = 'Applications';
   COLLECTION_NAME_ROLES = 'Roles';
   COLLECTION_NAME_USERS = 'UsersInRole';
+  COLLECTION_NAME_INSTANCES = 'ApplicationInstances';
   DEFAULT_APP_FILTER = 'ProdLog-*';
   PROPERTY_NAME_DESCRIPTION = 'Description';
+  PROPERTY_NAME_RECYCLED = 'HasRecycled';
+  PROPERTY_NAME_PAUSED = 'IsPaused';
+  PROPERTY_NAME_PROCESSID = 'ProcessID';
   ERROR_NOT_FOUND = 'Das Element %s wurde in der Auflistung nicht gefunden.';
 
 { TComAdminBaseObject }
@@ -176,13 +198,35 @@ constructor TComAdminApplication.Create(ACollection: TComAdminBaseList; ACatalog
 begin
   inherited Create(ACollection, ACatalogObject);
   FRoles := TComAdminRoleList.Create(ACollection.CatalogCollection.GetCollection(COLLECTION_NAME_ROLES, FKey) as ICatalogCollection);
+  FInstances := TComAdminInstanceList.Create;
   GetRoles;
 end;
 
 destructor TComAdminApplication.Destroy;
 begin
   FRoles.Free;
+  FInstances.Free;
   inherited;
+end;
+
+function TComAdminApplication.GetInstances: TComAdminInstanceList;
+var
+  Collection: ICatalogCollection;
+  Instance: TComAdminInstance;
+  i: Integer;
+begin
+  FInstances.Clear;
+  Collection := FCatalogCollection.GetCollection(COLLECTION_NAME_INSTANCES, FKey) as ICatalogCollection;
+  Collection.Populate;
+  for i := 0 to Collection.Count - 1 do
+  begin
+    Instance := TComAdminInstance.Create;
+    Instance.FHasRecycled := (Collection.Item[i] as ICatalogObject).Value[PROPERTY_NAME_RECYCLED];
+    Instance.FIsPaused := (Collection.Item[i] as ICatalogObject).Value[PROPERTY_NAME_PAUSED];
+    Instance.FProcessID := VarAsType((Collection.Item[i] as ICatalogObject).Value[PROPERTY_NAME_PROCESSID], varLongWord);
+    FInstances.Add(Instance);
+  end;
+  Result := FInstances;
 end;
 
 procedure TComAdminApplication.GetRoles;
@@ -191,6 +235,19 @@ var
 begin
   for i := 0 to FRoles.CatalogCollection.Count - 1 do
     FRoles.Add(TComAdminRole.Create(FRoles, FRoles.CatalogCollection.Item[i] as ICatalogObject));
+end;
+
+procedure TComAdminApplication.Shutdown;
+var
+  ProcessHandle: THandle;
+  Instance: TComAdminInstance;
+begin
+  GetInstances;
+  for Instance in FInstances do
+  begin
+    ProcessHandle := OpenProcess(PROCESS_TERMINATE, False, Instance.FProcessID);
+    TerminateProcess(ProcessHandle, 0);
+  end;
 end;
 
 { TComAdminApplicationList }
@@ -268,6 +325,16 @@ begin
     finally
       LMask.Free;
     end;
+  end;
+end;
+
+procedure TComAdminCatalog.SetFilter(const Value: string);
+begin
+  if not FFilter.Equals(Value) then
+  begin
+    FFilter := Value;
+    FApplications.Clear;
+    GetApplications;
   end;
 end;
 

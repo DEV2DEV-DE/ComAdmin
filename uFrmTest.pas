@@ -39,6 +39,7 @@ begin
   LCatalog := TComAdminCatalog.Create(cmbServer.Text);
   try
     //LCatalog.ExportApplication(20, 'D:\Test123.msi');
+    LCatalog.Filter := '*';
     for i := 0 to LCatalog.Applications.Count - 1 do
     begin
       AppNode := tvTree.Items.AddChild(nil, LCatalog.Applications[i].Name);
@@ -48,6 +49,9 @@ begin
         for k := 0 to LCatalog.Applications[i].Roles[j].Users.Count - 1 do
           tvTree.Items.AddChild(RoleNode, LCatalog.Applications[i].Roles[j].Users[k].Name);
       end;
+      LCatalog.Applications[i].GetInstances;
+      if LCatalog.Applications[i].Instances.Count > 0 then
+        LCatalog.Applications[i].Shutdown;
     end;
     tvTree.AlphaSort;
   finally
