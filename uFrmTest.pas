@@ -50,8 +50,6 @@ begin
           tvTree.Items.AddChild(RoleNode, LCatalog.Applications[i].Roles[j].Users[k].Name);
       end;
       LCatalog.Applications[i].GetInstances;
-      if LCatalog.Applications[i].Instances.Count > 0 then
-        LCatalog.Applications[i].Shutdown;
     end;
     tvTree.AlphaSort;
   finally
