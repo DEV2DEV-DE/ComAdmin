@@ -85,7 +85,6 @@ type
     constructor Create(ACollection: TComAdminBaseList; ACatalogObject: ICatalogObject); reintroduce;
     destructor Destroy; override;
     function GetInstances: TComAdminInstanceList;
-    procedure Shutdown;
     property Roles: TComAdminRoleList read FRoles;
     property Instances: TComAdminInstanceList read FInstances;
   end;
@@ -239,19 +238,6 @@ var
 begin
   for i := 0 to FRoles.CatalogCollection.Count - 1 do
     FRoles.Add(TComAdminRole.Create(FRoles, FRoles.CatalogCollection.Item[i] as ICatalogObject));
-end;
-
-procedure TComAdminApplication.Shutdown;
-var
-  ProcessHandle: THandle;
-  Instance: TComAdminBaseObject;
-begin
-  GetInstances;
-  for Instance in FInstances do
-  begin
-    ProcessHandle := OpenProcess(PROCESS_TERMINATE, False, (Instance as TComAdminInstance).FProcessID);
-    TerminateProcess(ProcessHandle, 0);
-  end;
 end;
 
 { TComAdminApplicationList }
