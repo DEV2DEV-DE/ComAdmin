@@ -34,6 +34,15 @@ type
   TCOMAdminQCAuthenticateMsgs = (COMAdminQCMessageAuthenticateSecureApps, COMAdminQCMessageAuthenticateOff, COMAdminQCMessageAuthenticateOn);
   TCOMAdminSRPTrustLevel = (COMAdminSRPDisallow = $0, COMAminSRPFullyTrusted = $40000);
 
+const
+  DEFAULT_CREATION_TIMEOUT = 60000;
+  DEFAULT_MAX_DUMP = 5;
+  DEFAULT_MAX_POOL = 1048576;
+  DEFAULT_RECYCLE_TIMEOUT = 15;
+  DEFAULT_SHUTDOWN = 3;
+  DEFAULT_TRANSACTION_TIMEOUT = 60;
+
+type
   // forward declaration of internally used classes
   TComAdminBaseList = class;
 
@@ -127,18 +136,74 @@ type
 
   TCOMAdminComponent = class(TComAdminBaseObject)
   strict private
-    procedure ReadExtendedProperties;
-  private
     FAllowInprocSubscribers: Boolean;
     FApplicationID: string;
     FBitness: TCOMAdminComponentType;
     FComponentAccessChecksEnabled: Boolean;
+    FComponentTransactionTimeout: Cardinal;
+    FComponentTransactionTimeoutEnabled: Boolean;
+    FCOMTIIntrinsics: Boolean;
+    FConstructionEnabled: Boolean;
+    FConstructorString: string;
+    FCreationTimeout: Cardinal;
+    FDescription: string;
+    FDll: string;
+    FEventTrackingEnabled: Boolean;
+    FExceptionClass: string;
+    FFireInParallel: Boolean;
+    FIISIntrinsics: Boolean;
+    FInitializeServerApplication: Boolean;
+    procedure ReadExtendedProperties;
+    procedure SetComponentTransactionTimeout(const Value: Cardinal);
+    procedure SetCreationTimeout(const Value: Cardinal);
+  private
+    FIsEnabled: Boolean;
+    FIsInstalled: Boolean;
+    FJustInTimeActivation: Boolean;
+    FLoadBalancingSupported: Boolean;
+    FIsEventClass: Boolean;
+    FIsPrivateComponent: Boolean;
+    FMinPoolSize: Cardinal;
+    FMaxPoolSize: Cardinal;
+    FMultiInterfacePublisherFilterCLSID: string;
+    FMustRunInDefaultContext: Boolean;
+    FMustRunInClientContext: Boolean;
+    FObjectPoolingEnabled: Boolean;
+    FProgID: string;
+    procedure SetMaxPoolSize(const Value: Cardinal);
+    procedure SetMinPoolSize(const Value: Cardinal);
   public
     constructor Create(ACollection: TComAdminBaseList; ACatalogObject: ICatalogObject); reintroduce;
     property AllowInprocSubscribers: Boolean read FAllowInprocSubscribers write FAllowInprocSubscribers default True;
     property ApplicationID: string read FApplicationID write FApplicationID;
     property Bitness: TCOMAdminComponentType read FBitness write FBitness;
     property ComponentAccessChecksEnabled: Boolean read FComponentAccessChecksEnabled write FComponentAccessChecksEnabled default False;
+    property ComponentTransactionTimeout: Cardinal read FComponentTransactionTimeout write SetComponentTransactionTimeout default DEFAULT_TRANSACTION_TIMEOUT;
+    property ComponentTransactionTimeoutEnabled: Boolean read FComponentTransactionTimeoutEnabled write FComponentTransactionTimeoutEnabled default False;
+    property COMTIIntrinsics: Boolean read FCOMTIIntrinsics write FCOMTIIntrinsics default False;
+    property ConstructionEnabled: Boolean read FConstructionEnabled write FConstructionEnabled default False;
+    property ConstructorString: string read FConstructorString write FConstructorString;
+    property CreationTimeout: Cardinal read FCreationTimeout write SetCreationTimeout default DEFAULT_CREATION_TIMEOUT;
+    property Description: string read FDescription write FDescription;
+    property Dll: string read FDll write FDll;
+    property EventTrackingEnabled: Boolean read FEventTrackingEnabled write FEventTrackingEnabled default True;
+    property ExceptionClass: string read FExceptionClass write FExceptionClass;
+    property FireInParallel: Boolean read FFireInParallel write FFireInParallel default False;
+    property IISIntrinsics: Boolean read FIISIntrinsics write FIISIntrinsics default False;
+    property InitializeServerApplication: Boolean read FInitializeServerApplication write FInitializeServerApplication default False;
+    property IsEnabled: Boolean read FIsEnabled write FIsEnabled default True;
+    property IsEventClass: Boolean read FIsEventClass write FIsEventClass default False;
+    property IsInstalled: Boolean read FIsInstalled write FIsInstalled default False;
+    property IsPrivateComponent: Boolean read FIsPrivateComponent write FIsPrivateComponent default False;
+    property JustInTimeActivation: Boolean read FJustInTimeActivation write FJustInTimeActivation default False;
+    property LoadBalancingSupported: Boolean read FLoadBalancingSupported write FLoadBalancingSupported default False;
+    property MaxPoolSize: Cardinal read FMaxPoolSize write SetMaxPoolSize default DEFAULT_MAX_POOL;
+    property MinPoolSize: Cardinal read FMinPoolSize write SetMinPoolSize default 0;
+    property MultiInterfacePublisherFilterCLSID: string read FMultiInterfacePublisherFilterCLSID write FMultiInterfacePublisherFilterCLSID;
+    property MustRunInClientContext: Boolean read FMustRunInClientContext write FMustRunInClientContext default False;
+    property MustRunInDefaultContext: Boolean read FMustRunInDefaultContext write FMustRunInDefaultContext default False;
+    property ObjectPoolingEnabled: Boolean read FObjectPoolingEnabled write FObjectPoolingEnabled default False;
+    property ProgID: string read FProgID write FProgID;
   end;
 
   TCOMAdminComponentList = class(TComAdminBaseList)
@@ -246,7 +311,7 @@ type
     property ImpersonationLevel: TCOMAdminImpersonationLevel read FImpersonationLevel write FImpersonationLevel default COMAdminImpersonationImpersonate;
     property IsEnabled: Boolean read FIsEnabled write FIsEnabled default True;
     property IsSystem: Boolean read FIsSystem default False;
-    property MaxDumpCount: Cardinal read FMaxDumpCount write SetMaxDumpCount default 5;
+    property MaxDumpCount: Cardinal read FMaxDumpCount write SetMaxDumpCount default DEFAULT_MAX_DUMP;
     property Password: string write FPassword;
     property QCAuthenticateMsgs: TCOMAdminQCAuthenticateMsgs read FQCAuthenticateMsgs write FQCAuthenticateMsgs default COMAdminQCMessageAuthenticateSecureApps;
     property QCListenerMaxThreads: Cardinal read FQCListenerMaxThreads write SetQCListenerMaxThreads default 0;
@@ -254,13 +319,13 @@ type
     property QueuingEnabled: Boolean read FQueuingEnabled write FQueuingEnabled default False;
     property RecycleActivationLimit: Cardinal read FRecycleActivationLimit write SetRecycleActivationLimit default 0;
     property RecycleCallLimit: Cardinal read FRecycleCallLimit write SetRecycleCallLimit default 0;
-    property RecycleExpirationTimeout: Cardinal read FRecycleExpirationTimeout write SetRecycleExpirationTimeout default 15;
+    property RecycleExpirationTimeout: Cardinal read FRecycleExpirationTimeout write SetRecycleExpirationTimeout default DEFAULT_RECYCLE_TIMEOUT;
     property RecycleLifetimeLimit: Cardinal read FRecycleLifetimeLimit write SetRecycleLifetimeLimit default 0;
     property RecycleMemoryLimit: Cardinal read FRecycleMemoryLimit write SetRecycleMemoryLimit default 0;
     property Replicable: Boolean read FReplicable write FReplicable default True;
     property RunForever: Boolean read FRunForever write FRunForever default False;
     property ServiceName: string read FServiceName write FServiceName;
-    property ShutdownAfter: Cardinal read FShutdownAfter write SetShutdownAfter default 3;
+    property ShutdownAfter: Cardinal read FShutdownAfter write SetShutdownAfter default DEFAULT_SHUTDOWN;
     property SoapActivated: Boolean read FSoapActivated write FSoapActivated default False;
     property SoapBaseUrl: string read FSoapBaseUrl write FSoapBaseUrl;
     property SoapMailTo: string read FSoapMailTo write FSoapMailTo;
@@ -327,7 +392,7 @@ type
     property SecurityTrackingEnabled: Boolean read FSecurityTrackingEnabled write FSecurityTrackingEnabled default True;
     property SRPActivateAsActivatorChecks: Boolean read FSRPActivateAsActivatorChecks write FSRPActivateAsActivatorChecks default True;
     property SRPRunningObjectChecks: Boolean read FSRPRunningObjectChecks write FSRPRunningObjectChecks default True;
-    property TransactionTimeout: Cardinal read FTransactionTimeout write SetTransactionTimeout default 60;
+    property TransactionTimeout: Cardinal read FTransactionTimeout write SetTransactionTimeout default DEFAULT_TRANSACTION_TIMEOUT;
   end;
 
   TComAdminCatalog = class(TObject)
@@ -384,8 +449,14 @@ const
   PROPERTY_NAME_CIS_ENABLED = 'CISEnabled';
   PROPERTY_NAME_COMMAND_LINE = 'CommandLine';
   PROPERTY_NAME_COMPONENT_ACCESS_CHECKS = 'ComponentAccessChecksEnabled';
+  PROPERTY_NAME_COMPONENT_TIMEOUT = 'ComponentTransactionTimeout';
+  PROPERTY_NAME_COMPONENT_TIMEOUT_ENABLED = 'ComponentTransactionTimeoutEnabled';
+  PROPERTY_NAME_COM_TIINTRINSICS = 'COMTIIntrinsics';
   PROPERTY_NAME_CONCURRENT_APPS = 'ConcurrentApps';
+  PROPERTY_NAME_CONSTRUCTION_ENABLED = 'ConstructionEnabled';
+  PROPERTY_NAME_CONSTRUCTOR_STRING = 'ConstructorString';
   PROPERTY_NAME_CREATED_BY = 'CreatedBy';
+  PROPERTY_NAME_CREATION_TIMEOUT = 'CreationTimeout';
   PROPERTY_NAME_CRM_ENABLED = 'CRMEnabled';
   PROPERTY_NAME_CRM_LOGFILE = 'CRMLogFile';
   PROPERTY_NAME_DCOM_ENABLED = 'DCOMEnabled';
@@ -394,6 +465,7 @@ const
   PROPERTY_NAME_DEFAULT_TO_INTERNET = 'DefaultToInternetPorts';
   PROPERTY_NAME_DELETEABLE = 'Deleteable';
   PROPERTY_NAME_DESCRIPTION = 'Description';
+  PROPERTY_NAME_DLL = 'DLL';
   PROPERTY_NAME_DS_PARTITION_LOOKUP = 'DSPartitionLookupEnabled';
   PROPERTY_NAME_DUMP_ENABLED = 'DumpEnabled';
   PROPERTY_NAME_DUMP_EXCEPTION = 'DumpOnException';
@@ -401,12 +473,28 @@ const
   PROPERTY_NAME_DUMP_PATH = 'DumpPath';
   PROPERTY_NAME_ENABLED = 'IsEnabled';
   PROPERTY_NAME_EVENTS_ENABLED = 'EventsEnabled';
+  PROPERTY_NAME_EVENT_TRACKING = 'EventTrackingEnabled';
+  PROPERTY_NAME_EXCEPTION_CLASS = 'ExceptionClass';
+  PROPERTY_NAME_FIRE_IN_PARALLEL = 'FireInParallel';
   PROPERTY_NAME_IDENTITY = 'Identity';
+  PROPERTY_NAME_IIS_INTRINSICS = 'IISIntrinsics';
   PROPERTY_NAME_IMPERSONATION = 'ImpersonationLevel';
+  PROPERTY_NAME_INIT_SERVER_APPLICATION = 'InitializeServerApplication';
   PROPERTY_NAME_INTERNET_PORTS = 'InternetPortsListed';
+  PROPERTY_NAME_IS_EVENT_CLASS = 'IsEventClass';
+  PROPERTY_NAME_IS_INSTALLED = 'IsInstalled';
+  PROPERTY_NAME_IS_PRIVATE_COMPONENT = 'IsPrivateComponent';
   PROPERTY_NAME_IS_ROUTER = 'IsRouter';
+  PROPERTY_NAME_JUST_IN_TIME = 'JustInTimeActivation';
+  PROPERTY_NAME_LOAD_BALANCING = 'LoadBalancingSupported';
   PROPERTY_NAME_LOAD_BALANCING_ID = 'LoadBalancingCLSID';
   PROPERTY_NAME_MAX_DUMPS = 'MaxDumpCount';
+  PROPERTY_NAME_MAX_POOL_SIZE = 'MaxPoolSize';
+  PROPERTY_NAME_MIN_POOL_SIZE = 'MinPoolSize';
+  PROPERTY_NAME_MI_FILTER_CLSID = 'MultiInterfacePublisherFilterCLSID';
+  PROPERTY_NAME_MUST_RUN_CLIENT_CONTEXT = 'MustRunInClientContext';
+  PROPERTY_NAME_MUST_RUN_DEFAULT_CONTEXT = 'MustRunInDefaultContext';
+  PROPERTY_NAME_OBJECT_POOLING = 'ObjectPoolingEnabled';
   PROPERTY_NAME_OPERATING_SYSTEM = 'OperatingSystem';
   PROPERTY_NAME_PARTITION_ID = 'AppPartitionID';
   PROPERTY_NAME_PARTITION_LOOKUP = 'LocalPartitionLookupEnabled';
@@ -415,6 +503,7 @@ const
   PROPERTY_NAME_PAUSED = 'IsPaused';
   PROPERTY_NAME_PORTS = 'Ports';
   PROPERTY_NAME_PROCESSID = 'ProcessID';
+  PROPERTY_NAME_PROG_ID = 'ProgID';
   PROPERTY_NAME_PROXY_RSN = 'ApplicationProxyRSN';
   PROPERTY_NAME_PROXY_SERVER_NAME = 'ApplicationProxyServerName';
   PROPERTY_NAME_QC_AUTHENTICATE = 'QCAuthenticateMsgs';
@@ -550,6 +639,68 @@ begin
   FApplicationID := VarToStr(FCatalogObject.Value[PROPERTY_NAME_APPLICATION_ID]);
   FBitness := VarAsType(FCatalogObject.Value[PROPERTY_NAME_BITNESS], varLongWord);
   FComponentAccessChecksEnabled := VarAsType(FCatalogObject.Value[PROPERTY_NAME_COMPONENT_ACCESS_CHECKS], varBoolean);
+  FComponentTransactionTimeout := VarAsType(FCatalogObject.Value[PROPERTY_NAME_COMPONENT_TIMEOUT], varLongWord);
+  FComponentTransactionTimeoutEnabled := VarAsType(FCatalogObject.Value[PROPERTY_NAME_COMPONENT_TIMEOUT_ENABLED], varBoolean);
+  FCOMTIIntrinsics := VarAsType(FCatalogObject.Value[PROPERTY_NAME_COM_TIINTRINSICS], varBoolean);
+  FConstructionEnabled := VarAsType(FCatalogObject.Value[PROPERTY_NAME_CONSTRUCTION_ENABLED], varBoolean);
+  FConstructorString := VarToStr(FCatalogObject.Value[PROPERTY_NAME_CONSTRUCTOR_STRING]);
+  FCreationTimeout := VarAsType(FCatalogObject.Value[PROPERTY_NAME_CREATION_TIMEOUT], varLongWord);
+  FDescription := VarToStr(FCatalogObject.Value[PROPERTY_NAME_DESCRIPTION]);
+  FDll := VarToStr(FCatalogObject.Value[PROPERTY_NAME_DLL]);
+  FEventTrackingEnabled := VarAsType(FCatalogObject.Value[PROPERTY_NAME_EVENT_TRACKING], varBoolean);
+  FExceptionClass := VarToStr(FCatalogObject.Value[PROPERTY_NAME_EXCEPTION_CLASS]);
+  FFireInParallel := VarAsType(FCatalogObject.Value[PROPERTY_NAME_FIRE_IN_PARALLEL], varBoolean);
+  FIISIntrinsics := VarAsType(FCatalogObject.Value[PROPERTY_NAME_IIS_INTRINSICS], varBoolean);
+//  FInitializeServerApplication := VarAsType(FCatalogObject.Value[PROPERTY_NAME_INIT_SERVER_APPLICATION], varBoolean);
+  FIsEnabled := VarAsType(FCatalogObject.Value[PROPERTY_NAME_ENABLED], varBoolean);
+  FIsEventClass := VarAsType(FCatalogObject.Value[PROPERTY_NAME_IS_EVENT_CLASS], varBoolean);
+  FIsInstalled := VarAsType(FCatalogObject.Value[PROPERTY_NAME_IS_INSTALLED], varBoolean);
+  FIsPrivateComponent := VarAsType(FCatalogObject.Value[PROPERTY_NAME_IS_PRIVATE_COMPONENT], varBoolean);
+  FJustInTimeActivation := VarAsType(FCatalogObject.Value[PROPERTY_NAME_JUST_IN_TIME], varBoolean);
+  FLoadBalancingSupported := VarAsType(FCatalogObject.Value[PROPERTY_NAME_LOAD_BALANCING], varBoolean);
+  FMaxPoolSize := VarAsType(FCatalogObject.Value[PROPERTY_NAME_MAX_POOL_SIZE], varLongWord);
+  FMinPoolSize := VarAsType(FCatalogObject.Value[PROPERTY_NAME_MIN_POOL_SIZE], varLongWord);
+  FMultiInterfacePublisherFilterCLSID := VarToStr(FCatalogObject.Value[PROPERTY_NAME_MI_FILTER_CLSID]);
+  FMustRunInClientContext := VarAsType(FCatalogObject.Value[PROPERTY_NAME_MUST_RUN_CLIENT_CONTEXT], varBoolean);
+  FMustRunInDefaultContext := VarAsType(FCatalogObject.Value[PROPERTY_NAME_MUST_RUN_DEFAULT_CONTEXT], varBoolean);
+  FObjectPoolingEnabled := VarAsType(FCatalogObject.Value[PROPERTY_NAME_OBJECT_POOLING], varBoolean);
+  FProgID := VarToStr(FCatalogObject.Value[PROPERTY_NAME_PROG_ID]);
+end;
+
+procedure TCOMAdminComponent.SetComponentTransactionTimeout(const Value: Cardinal);
+begin
+  case Value of
+    0..3600: FComponentTransactionTimeout := Value;
+  else
+    raise EArgumentOutOfRangeException.Create(ERROR_OUT_OF_RANGE);
+  end;
+end;
+
+procedure TCOMAdminComponent.SetCreationTimeout(const Value: Cardinal);
+begin
+  case Value of
+    0..MAXLONG: FCreationTimeout := Value;
+  else
+    raise EArgumentOutOfRangeException.Create(ERROR_OUT_OF_RANGE);
+  end;
+end;
+
+procedure TCOMAdminComponent.SetMaxPoolSize(const Value: Cardinal);
+begin
+  case Value of
+    0..DEFAULT_MAX_POOL: FMaxPoolSize := Value;
+  else
+    raise EArgumentOutOfRangeException.Create(ERROR_OUT_OF_RANGE);
+  end;
+end;
+
+procedure TCOMAdminComponent.SetMinPoolSize(const Value: Cardinal);
+begin
+  case Value of
+    0..DEFAULT_MAX_POOL: FMinPoolSize := Value;
+  else
+    raise EArgumentOutOfRangeException.Create(ERROR_OUT_OF_RANGE);
+  end;
 end;
 
 { TCOMAdminComponentList }
