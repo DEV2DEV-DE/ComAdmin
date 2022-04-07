@@ -11,9 +11,10 @@ type
     btnComAdmin: TButton;
     tvTree: TTreeView;
     cmbServer: TComboBox;
+    memoLog: TMemo;
     procedure btnComAdminClick(Sender: TObject);
   private
-    { Private-Deklarationen }
+    procedure OnReadCOMObject(const AObjectType, AObjectName: string);
   public
     { Public-Deklarationen }
   end;
@@ -36,10 +37,10 @@ var
   k: Integer;
 begin
   tvTree.Items.Clear;
-  LCatalog := TComAdminCatalog.Create(cmbServer.Text);
+  memoLog.Clear;
+  LCatalog := TComAdminCatalog.Create(cmbServer.Text, '', OnReadCOMObject);
   try
     //LCatalog.ExportApplication(20, 'D:\Test123.msi');
-    LCatalog.Filter := '*';
     for i := 0 to LCatalog.Applications.Count - 1 do
     begin
       AppNode := tvTree.Items.AddChild(nil, LCatalog.Applications[i].Name);
@@ -49,12 +50,17 @@ begin
         for k := 0 to LCatalog.Applications[i].Roles[j].Users.Count - 1 do
           tvTree.Items.AddChild(RoleNode, LCatalog.Applications[i].Roles[j].Users[k].Name);
       end;
-      LCatalog.Applications[i].GetInstances;
     end;
     tvTree.AlphaSort;
   finally
     LCatalog.Free;
   end;
+end;
+
+procedure TFrmTest.OnReadCOMObject(const AObjectType, AObjectName: string);
+begin
+  memoLog.Lines.AddPair(AObjectType, AObjectName);
+  memoLog.ScrollBy(0, 1)
 end;
 
 end.

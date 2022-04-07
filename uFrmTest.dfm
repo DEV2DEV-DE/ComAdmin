@@ -10,12 +10,10 @@ object FrmTest: TFrmTest
   Font.Height = -11
   Font.Name = 'Tahoma'
   Font.Style = []
-  OldCreateOrder = False
   Position = poScreenCenter
   DesignSize = (
     433
     585)
-  PixelsPerInch = 96
   TextHeight = 13
   object btnComAdmin: TButton
     Left = 8
@@ -30,7 +28,7 @@ object FrmTest: TFrmTest
     Left = 8
     Top = 39
     Width = 417
-    Height = 538
+    Height = 394
     Anchors = [akLeft, akTop, akRight, akBottom]
     Indent = 19
     ReadOnly = True
@@ -49,5 +47,18 @@ object FrmTest: TFrmTest
       'defthwa006dsrv'
       'defthwa006esrv'
       'defthwa006fsrv')
+  end
+  object memoLog: TMemo
+    Left = 8
+    Top = 439
+    Width = 417
+    Height = 138
+    Anchors = [akLeft, akRight, akBottom]
+    BevelInner = bvNone
+    BevelKind = bkFlat
+    BevelOuter = bvRaised
+    BorderStyle = bsNone
+    ScrollBars = ssVertical
+    TabOrder = 3
   end
 end
