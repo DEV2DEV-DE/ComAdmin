@@ -51,17 +51,19 @@ type
 
   // generic base class for all single objects
   TComAdminBaseObject = class(TObject)
-  private
-    FCatalogObject: ICatalogObject;
+  strict private
     FCatalogCollection: ICatalogCollection;
+    FCatalogObject: ICatalogObject;
     FCollection: TComAdminBaseList;
     FKey: string;
     FName: string;
+  private
     function InternalCheckRange(AMinValue, AMaxValue, AValue: Cardinal): Boolean;
     procedure CopyObject(ASourceObject, ATargetObject: TComAdminBaseObject);
   public
     constructor Create(ACollection: TComAdminBaseList; ACatalogObject: ICatalogObject); reintroduce;
     procedure CopyProperties(ABaseClass: TComAdminBaseObject);
+    property CatalogCollection: ICatalogCollection read FCatalogCollection;
     property CatalogObject: ICatalogObject read FCatalogObject;
     property Collection: TComAdminBaseList read FCollection;
     property Key: string read FKey write FKey;
@@ -122,11 +124,13 @@ type
   end;
 
   TComAdminInstance = class(TComAdminBaseObject)
-  private
+  strict private
     FProcessID: Cardinal;
     FHasRecycled: Boolean;
     FIsPaused: Boolean;
+    procedure ReadExtendedProperties;
   public
+    constructor Create(ACollection: TComAdminBaseList; ACatalogObject: ICatalogObject); reintroduce;
     property HasRecycled: Boolean read FHasRecycled;
     property IsPaused: Boolean read FIsPaused;
     property ProcessID: Cardinal read FProcessID;
@@ -178,10 +182,6 @@ type
     FFireInParallel: Boolean;
     FIISIntrinsics: Boolean;
     FInitializeServerApplication: Boolean;
-    procedure ReadExtendedProperties;
-    procedure SetComponentTransactionTimeout(const Value: Cardinal);
-    procedure SetCreationTimeout(const Value: Cardinal);
-  private
     FIsEnabled: Boolean;
     FIsInstalled: Boolean;
     FJustInTimeActivation: Boolean;
@@ -195,10 +195,16 @@ type
     FMustRunInClientContext: Boolean;
     FObjectPoolingEnabled: Boolean;
     FProgID: string;
+    FRoles: TComAdminRoleList;
+    procedure GetRoles;
+    procedure ReadExtendedProperties;
+    procedure SetComponentTransactionTimeout(const Value: Cardinal);
+    procedure SetCreationTimeout(const Value: Cardinal);
     procedure SetMaxPoolSize(const Value: Cardinal);
     procedure SetMinPoolSize(const Value: Cardinal);
   public
     constructor Create(ACollection: TComAdminBaseList; ACatalogObject: ICatalogObject); reintroduce;
+    destructor Destroy; override;
     property AllowInprocSubscribers: Boolean read FAllowInprocSubscribers write FAllowInprocSubscribers default True;
     property ApplicationID: string read FApplicationID write FApplicationID;
     property Bitness: TCOMAdminComponentType read FBitness write FBitness;
@@ -229,6 +235,7 @@ type
     property MustRunInDefaultContext: Boolean read FMustRunInDefaultContext write FMustRunInDefaultContext default False;
     property ObjectPoolingEnabled: Boolean read FObjectPoolingEnabled write FObjectPoolingEnabled default False;
     property ProgID: string read FProgID write FProgID;
+    property Roles: TComAdminRoleList read FRoles write FRoles;
   end;
 
   TCOMAdminComponentList = class(TComAdminBaseList)
@@ -295,18 +302,6 @@ type
     procedure GetComponents;
     procedure GetRoles;
     procedure ReadExtendedProperties;
-    procedure SetConcurrentApps(const Value: Cardinal);
-    procedure SetMaxDumpCount(const Value: Cardinal);
-    procedure SetQCListenerMaxThreads(const Value: Cardinal);
-    procedure SetRecycleActivationLimit(const Value: Cardinal);
-    procedure SetRecycleCallLimit(const Value: Cardinal);
-    procedure SetRecycleExpirationTimeout(const Value: Cardinal);
-    procedure SetRecycleLifetimeLimit(const Value: Cardinal);
-    procedure SetRecycleMemoryLimit(const Value: Cardinal);
-    procedure SetShutdownAfter(const Value: Cardinal);
-    procedure SyncRoles(ASourceApplication: TCOMAdminApplication);
-    procedure SyncComponents(ASourceApplication: TCOMAdminApplication);
-  private
     procedure SetAccessChecksEnabled(const Value: Boolean);
     procedure SetAccessChecksLevel(const Value: TCOMAdminAccessChecksLevelOptions);
     procedure SetActivation(const Value: TCOMAdminApplicationActivation);
@@ -314,6 +309,7 @@ type
     procedure SetAuthenticationLevel(const Value: TCOMAdminAuthenticationLevel);
     procedure SetChangeable(const Value: Boolean);
     procedure SetCommandLine(const Value: string);
+    procedure SetConcurrentApps(const Value: Cardinal);
     procedure SetCreatedBy(const Value: string);
     procedure SetCRMEnabled(const Value: Boolean);
     procedure SetCRMLogFile(const Value: string);
@@ -329,22 +325,32 @@ type
     procedure SetIdentity(const Value: string);
     procedure SetImpersonationLevel(const Value: TCOMAdminImpersonationLevel);
     procedure SetIsEnabled(const Value: Boolean);
+    procedure SetMaxDumpCount(const Value: Cardinal);
     procedure SetPartitionID(const Value: string);
     procedure SetPassword(const Value: string);
     procedure SetProxy(const Value: Boolean);
     procedure SetProxyServerName(const Value: string);
     procedure SetQCAuthenticateMsgs(const Value: TCOMAdminQCAuthenticateMsgs);
+    procedure SetQCListenerMaxThreads(const Value: Cardinal);
     procedure SetQueueListenerEnabled(const Value: Boolean);
     procedure SetQueuingEnabled(const Value: Boolean);
+    procedure SetRecycleActivationLimit(const Value: Cardinal);
+    procedure SetRecycleCallLimit(const Value: Cardinal);
+    procedure SetRecycleExpirationTimeout(const Value: Cardinal);
+    procedure SetRecycleLifetimeLimit(const Value: Cardinal);
+    procedure SetRecycleMemoryLimit(const Value: Cardinal);
     procedure SetReplicable(const Value: Boolean);
     procedure SetRunForever(const Value: Boolean);
     procedure SetServiceName(const Value: string);
+    procedure SetShutdownAfter(const Value: Cardinal);
     procedure SetSoapActivated(const Value: Boolean);
     procedure SetSoapBaseUrl(const Value: string);
     procedure SetSoapMailTo(const Value: string);
     procedure SetSoapVRoot(const Value: string);
     procedure SetSRPEnabled(const Value: Boolean);
     procedure SetSRPTrustLevel(const Value: TCOMAdminSRPTrustLevel);
+    procedure SyncComponents(ASourceApplication: TCOMAdminApplication);
+    procedure SyncRoles(ASourceApplication: TCOMAdminApplication);
   public
     constructor Create(ACollection: TComAdminBaseList; ACatalogObject: ICatalogObject); reintroduce;
     destructor Destroy; override;
@@ -416,15 +422,15 @@ type
   TComAdminComputer = class(TComAdminBaseObject)
   strict private
     FApplicationProxyRSN: string;
-    FDCOMEnabled: Boolean;
-    FCISEnabled: Boolean;
-    FImpersonationLevel: TCOMAdminImpersonationLevel;
     FAuthenticationLevel: TCOMAdminAuthenticationLevel;
+    FCISEnabled: Boolean;
+    FDCOMEnabled: Boolean;
     FDefaultToInternetPorts: Boolean;
     FDescription: string;
     FDSPartitionLookupEnabled: Boolean;
-    FIsRouter: Boolean;
+    FImpersonationLevel: TCOMAdminImpersonationLevel;
     FInternetPortsListed: Boolean;
+    FIsRouter: Boolean;
     FLoadBalancingCLSID: string;
     FLocalPartitionLookupEnabled: Boolean;
     FOperatingSystem: TCOMAdminOperatingSystem;
@@ -432,13 +438,12 @@ type
     FPorts: string;
     FResourcePoolingEnabled: Boolean;
     FRPCProxyEnabled: Boolean;
-    procedure ReadExtendedProperties;
-  private
     FSecureReferencesEnabled: Boolean;
     FSecurityTrackingEnabled: Boolean;
     FSRPActivateAsActivatorChecks: Boolean;
     FSRPRunningObjectChecks: Boolean;
     FTransactionTimeout: Cardinal;
+    procedure ReadExtendedProperties;
     procedure SetTransactionTimeout(const Value: Cardinal);
   public
     constructor Create(ACatalogCollection: ICatalogCollection); reintroduce;
@@ -509,6 +514,7 @@ uses
 const
   COLLECTION_NAME_APPS = 'Applications';
   COLLECTION_NAME_COMPONENTS = 'Components';
+  COLLECTION_NAME_COMPONENT_ROLES = 'RolesForComponent';
   COLLECTION_NAME_COMPUTER = 'LocalComputer';
   COLLECTION_NAME_INSTANCES = 'ApplicationInstances';
   COLLECTION_NAME_PARTITIONS = 'Partitions';
@@ -737,7 +743,7 @@ begin
   inherited CopyProperties(ASourceRole);
 
   // Changes must be saved before any sub-collections can be updated
-  Result := FCatalogCollection.SaveChanges;
+  Result := CatalogCollection.SaveChanges;
 
   // Synchronize users from source role
   SyncUsers(ASourceRole);
@@ -746,8 +752,8 @@ end;
 constructor TComAdminRole.Create(ACollection: TComAdminBaseList; ACatalogObject: ICatalogObject);
 begin
   inherited Create(ACollection, ACatalogObject);
-  FDescription := VarToStrDef(FCatalogObject.Value[PROPERTY_NAME_DESCRIPTION], '');
-  FUsers := TComAdminUserList.Create(Self, ACollection.Catalog, ACollection.CatalogCollection.GetCollection(COLLECTION_NAME_USERS, FKey) as ICatalogCollection);
+  FDescription := VarToStrDef(CatalogObject.Value[PROPERTY_NAME_DESCRIPTION], '');
+  FUsers := TComAdminUserList.Create(Self, ACollection.Catalog, ACollection.CatalogCollection.GetCollection(COLLECTION_NAME_USERS, Key) as ICatalogCollection);
   GetUsers;
 end;
 
@@ -768,8 +774,8 @@ end;
 procedure TComAdminRole.SetDescription(const Value: string);
 begin
   FDescription := Value;
-  if not FCatalogObject.IsPropertyReadOnly(PROPERTY_NAME_DESCRIPTION) then
-    FCatalogObject.Value[PROPERTY_NAME_DESCRIPTION] := FDescription;
+  if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_DESCRIPTION) then
+    CatalogObject.Value[PROPERTY_NAME_DESCRIPTION] := FDescription;
 end;
 
 procedure TComAdminRole.SyncUsers(ASourceRole: TComAdminRole);
@@ -818,6 +824,21 @@ begin
   Result := inherited Items[Index] as TComAdminRole;
 end;
 
+{ TComAdminInstance }
+
+constructor TComAdminInstance.Create(ACollection: TComAdminBaseList; ACatalogObject: ICatalogObject);
+begin
+  inherited Create(ACollection, ACatalogObject);
+  ReadExtendedProperties;
+end;
+
+procedure TComAdminInstance.ReadExtendedProperties;
+begin
+  FHasRecycled := CatalogObject.Value[PROPERTY_NAME_RECYCLED];
+  FIsPaused := CatalogObject.Value[PROPERTY_NAME_PAUSED];
+  FProcessID := VarAsType(CatalogObject.Value[PROPERTY_NAME_PROCESSID], varLongWord);
+end;
+
 { TComAdminInstanceList }
 
 function TComAdminInstanceList.GetItem(Index: Integer): TComAdminInstance;
@@ -835,9 +856,9 @@ end;
 
 procedure TComAdminPartition.ReadExtendedProperties;
 begin
-  FChangeable := VarAsType(FCatalogObject.Value[PROPERTY_NAME_CHANGEABLE], varBoolean);
-  FDeleteable := VarAsType(FCatalogObject.Value[PROPERTY_NAME_DELETEABLE], varBoolean);
-  FDescription := VarToStr(FCatalogObject.Value[PROPERTY_NAME_DESCRIPTION]);
+  FChangeable := VarAsType(CatalogObject.Value[PROPERTY_NAME_CHANGEABLE], varBoolean);
+  FDeleteable := VarAsType(CatalogObject.Value[PROPERTY_NAME_DELETEABLE], varBoolean);
+  FDescription := VarToStr(CatalogObject.Value[PROPERTY_NAME_DESCRIPTION]);
 end;
 
 { TComAdminPartitionList }
@@ -853,40 +874,56 @@ constructor TCOMAdminComponent.Create(ACollection: TComAdminBaseList; ACatalogOb
 begin
   inherited Create(ACollection, ACatalogObject);
   ReadExtendedProperties;
+  FRoles := TComAdminRoleList.Create(Self, ACollection.Catalog, ACollection.CatalogCollection.GetCollection(COLLECTION_NAME_COMPONENT_ROLES, Key) as ICatalogCollection);
+  GetRoles;
+end;
+
+destructor TCOMAdminComponent.Destroy;
+begin
+  FRoles.Free;
+  inherited;
+end;
+
+procedure TCOMAdminComponent.GetRoles;
+var
+  i: Integer;
+begin
+  for i := 0 to FRoles.CatalogCollection.Count - 1 do
+    FRoles.Add(TComAdminRole.Create(FRoles, FRoles.CatalogCollection.Item[i] as ICatalogObject));
 end;
 
 procedure TCOMAdminComponent.ReadExtendedProperties;
 begin
-  FAllowInprocSubscribers := VarAsType(FCatalogObject.Value[PROPERTY_NAME_ALLOW_SUBSCRIBERS], varBoolean);
-  FApplicationID := VarToStr(FCatalogObject.Value[PROPERTY_NAME_APPLICATION_ID]);
-  FBitness := VarAsType(FCatalogObject.Value[PROPERTY_NAME_BITNESS], varLongWord);
-  FComponentAccessChecksEnabled := VarAsType(FCatalogObject.Value[PROPERTY_NAME_COMPONENT_ACCESS_CHECKS], varBoolean);
-  FComponentTransactionTimeout := VarAsType(FCatalogObject.Value[PROPERTY_NAME_COMPONENT_TIMEOUT], varLongWord);
-  FComponentTransactionTimeoutEnabled := VarAsType(FCatalogObject.Value[PROPERTY_NAME_COMPONENT_TIMEOUT_ENABLED], varBoolean);
-  FCOMTIIntrinsics := VarAsType(FCatalogObject.Value[PROPERTY_NAME_COM_TIINTRINSICS], varBoolean);
-  FConstructionEnabled := VarAsType(FCatalogObject.Value[PROPERTY_NAME_CONSTRUCTION_ENABLED], varBoolean);
-  FConstructorString := VarToStr(FCatalogObject.Value[PROPERTY_NAME_CONSTRUCTOR_STRING]);
-  FCreationTimeout := VarAsType(FCatalogObject.Value[PROPERTY_NAME_CREATION_TIMEOUT], varLongWord);
-  FDescription := VarToStr(FCatalogObject.Value[PROPERTY_NAME_DESCRIPTION]);
-  FDll := VarToStr(FCatalogObject.Value[PROPERTY_NAME_DLL]);
-  FEventTrackingEnabled := VarAsType(FCatalogObject.Value[PROPERTY_NAME_EVENT_TRACKING], varBoolean);
-  FExceptionClass := VarToStr(FCatalogObject.Value[PROPERTY_NAME_EXCEPTION_CLASS]);
-  FFireInParallel := VarAsType(FCatalogObject.Value[PROPERTY_NAME_FIRE_IN_PARALLEL], varBoolean);
-  FIISIntrinsics := VarAsType(FCatalogObject.Value[PROPERTY_NAME_IIS_INTRINSICS], varBoolean);
-//  FInitializeServerApplication := VarAsType(FCatalogObject.Value[PROPERTY_NAME_INIT_SERVER_APPLICATION], varBoolean);
-  FIsEnabled := VarAsType(FCatalogObject.Value[PROPERTY_NAME_ENABLED], varBoolean);
-  FIsEventClass := VarAsType(FCatalogObject.Value[PROPERTY_NAME_IS_EVENT_CLASS], varBoolean);
-  FIsInstalled := VarAsType(FCatalogObject.Value[PROPERTY_NAME_IS_INSTALLED], varBoolean);
-  FIsPrivateComponent := VarAsType(FCatalogObject.Value[PROPERTY_NAME_IS_PRIVATE_COMPONENT], varBoolean);
-  FJustInTimeActivation := VarAsType(FCatalogObject.Value[PROPERTY_NAME_JUST_IN_TIME], varBoolean);
-  FLoadBalancingSupported := VarAsType(FCatalogObject.Value[PROPERTY_NAME_LOAD_BALANCING], varBoolean);
-  FMaxPoolSize := VarAsType(FCatalogObject.Value[PROPERTY_NAME_MAX_POOL_SIZE], varLongWord);
-  FMinPoolSize := VarAsType(FCatalogObject.Value[PROPERTY_NAME_MIN_POOL_SIZE], varLongWord);
-  FMultiInterfacePublisherFilterCLSID := VarToStr(FCatalogObject.Value[PROPERTY_NAME_MI_FILTER_CLSID]);
-  FMustRunInClientContext := VarAsType(FCatalogObject.Value[PROPERTY_NAME_MUST_RUN_CLIENT_CONTEXT], varBoolean);
-  FMustRunInDefaultContext := VarAsType(FCatalogObject.Value[PROPERTY_NAME_MUST_RUN_DEFAULT_CONTEXT], varBoolean);
-  FObjectPoolingEnabled := VarAsType(FCatalogObject.Value[PROPERTY_NAME_OBJECT_POOLING], varBoolean);
-  FProgID := VarToStr(FCatalogObject.Value[PROPERTY_NAME_PROG_ID]);
+  FAllowInprocSubscribers := VarAsType(CatalogObject.Value[PROPERTY_NAME_ALLOW_SUBSCRIBERS], varBoolean);
+  FApplicationID := VarToStr(CatalogObject.Value[PROPERTY_NAME_APPLICATION_ID]);
+  FBitness := VarAsType(CatalogObject.Value[PROPERTY_NAME_BITNESS], varLongWord);
+  FComponentAccessChecksEnabled := VarAsType(CatalogObject.Value[PROPERTY_NAME_COMPONENT_ACCESS_CHECKS], varBoolean);
+  FComponentTransactionTimeout := VarAsType(CatalogObject.Value[PROPERTY_NAME_COMPONENT_TIMEOUT], varLongWord);
+  FComponentTransactionTimeoutEnabled := VarAsType(CatalogObject.Value[PROPERTY_NAME_COMPONENT_TIMEOUT_ENABLED], varBoolean);
+  FCOMTIIntrinsics := VarAsType(CatalogObject.Value[PROPERTY_NAME_COM_TIINTRINSICS], varBoolean);
+  FConstructionEnabled := VarAsType(CatalogObject.Value[PROPERTY_NAME_CONSTRUCTION_ENABLED], varBoolean);
+  FConstructorString := VarToStr(CatalogObject.Value[PROPERTY_NAME_CONSTRUCTOR_STRING]);
+  FCreationTimeout := VarAsType(CatalogObject.Value[PROPERTY_NAME_CREATION_TIMEOUT], varLongWord);
+  FDescription := VarToStr(CatalogObject.Value[PROPERTY_NAME_DESCRIPTION]);
+  FDll := VarToStr(CatalogObject.Value[PROPERTY_NAME_DLL]);
+  FEventTrackingEnabled := VarAsType(CatalogObject.Value[PROPERTY_NAME_EVENT_TRACKING], varBoolean);
+  FExceptionClass := VarToStr(CatalogObject.Value[PROPERTY_NAME_EXCEPTION_CLASS]);
+  FFireInParallel := VarAsType(CatalogObject.Value[PROPERTY_NAME_FIRE_IN_PARALLEL], varBoolean);
+  FIISIntrinsics := VarAsType(CatalogObject.Value[PROPERTY_NAME_IIS_INTRINSICS], varBoolean);
+//  FInitializeServerApplication := VarAsType(CatalogObject.Value[PROPERTY_NAME_INIT_SERVER_APPLICATION], varBoolean);
+  FIsEnabled := VarAsType(CatalogObject.Value[PROPERTY_NAME_ENABLED], varBoolean);
+  FIsEventClass := VarAsType(CatalogObject.Value[PROPERTY_NAME_IS_EVENT_CLASS], varBoolean);
+  FIsInstalled := VarAsType(CatalogObject.Value[PROPERTY_NAME_IS_INSTALLED], varBoolean);
+  FIsPrivateComponent := VarAsType(CatalogObject.Value[PROPERTY_NAME_IS_PRIVATE_COMPONENT], varBoolean);
+  FJustInTimeActivation := VarAsType(CatalogObject.Value[PROPERTY_NAME_JUST_IN_TIME], varBoolean);
+  FLoadBalancingSupported := VarAsType(CatalogObject.Value[PROPERTY_NAME_LOAD_BALANCING], varBoolean);
+  FMaxPoolSize := VarAsType(CatalogObject.Value[PROPERTY_NAME_MAX_POOL_SIZE], varLongWord);
+  FMinPoolSize := VarAsType(CatalogObject.Value[PROPERTY_NAME_MIN_POOL_SIZE], varLongWord);
+  FMultiInterfacePublisherFilterCLSID := VarToStr(CatalogObject.Value[PROPERTY_NAME_MI_FILTER_CLSID]);
+  FMustRunInClientContext := VarAsType(CatalogObject.Value[PROPERTY_NAME_MUST_RUN_CLIENT_CONTEXT], varBoolean);
+  FMustRunInDefaultContext := VarAsType(CatalogObject.Value[PROPERTY_NAME_MUST_RUN_DEFAULT_CONTEXT], varBoolean);
+  FObjectPoolingEnabled := VarAsType(CatalogObject.Value[PROPERTY_NAME_OBJECT_POOLING], varBoolean);
+  FProgID := VarToStr(CatalogObject.Value[PROPERTY_NAME_PROG_ID]);
 end;
 
 procedure TCOMAdminComponent.SetComponentTransactionTimeout(const Value: Cardinal);
@@ -929,7 +966,6 @@ end;
 
 function TCOMAdminComponentList.Append(ASourceComponent: TCOMAdminComponent): TCOMAdminComponent;
 var
-  LComponent: ICatalogObject;
   LLibraryName: string;
 begin
   LLibraryName := TPath.Combine(Catalog.LibraryPath, ExtractFileName(ASourceComponent.Dll));
@@ -966,7 +1002,7 @@ begin
   inherited CopyProperties(ASourceApplication);
 
   // Changes must be saved before any sub-collections can be updated
-  Result := FCatalogCollection.SaveChanges;
+  Result := CatalogCollection.SaveChanges;
 
   // Synchronize roles from source application
   SyncRoles(ASourceApplication);
@@ -979,11 +1015,11 @@ begin
   inherited Create(ACollection, ACatalogObject);
   ReadExtendedProperties;
   // Create List objects
-  FInstances := TComAdminInstanceList.Create(Self, ACollection.Catalog, ACollection.CatalogCollection.GetCollection(COLLECTION_NAME_INSTANCES, FKey) as ICatalogCollection);
+  FInstances := TComAdminInstanceList.Create(Self, ACollection.Catalog, ACollection.CatalogCollection.GetCollection(COLLECTION_NAME_INSTANCES, Key) as ICatalogCollection);
   GetInstances;
-  FRoles := TComAdminRoleList.Create(Self, ACollection.Catalog, ACollection.CatalogCollection.GetCollection(COLLECTION_NAME_ROLES, FKey) as ICatalogCollection);
+  FRoles := TComAdminRoleList.Create(Self, ACollection.Catalog, ACollection.CatalogCollection.GetCollection(COLLECTION_NAME_ROLES, Key) as ICatalogCollection);
   GetRoles;
-  FComponents := TCOMAdminComponentList.Create(Self, ACollection.Catalog, ACollection.CatalogCollection.GetCollection(COLLECTION_NAME_COMPONENTS, FKey) as ICatalogCollection);
+  FComponents := TCOMAdminComponentList.Create(Self, ACollection.Catalog, ACollection.CatalogCollection.GetCollection(COLLECTION_NAME_COMPONENTS, Key) as ICatalogCollection);
   GetComponents;
 end;
 
@@ -1014,8 +1050,8 @@ end;
 function TComAdminApplication.InstallComponent(const ALibraryName: string): TCOMAdminComponent;
 begin
   Collection.Catalog.Catalog.InstallComponent(Key, ALibraryName, '', '');
-  FCollection.SaveChanges;
-  Result := FCollection.Items[Collection.Count - 1] as TCOMAdminComponent;
+  Collection.SaveChanges;
+  Result := Collection.Items[Collection.Count - 1] as TCOMAdminComponent;
 end;
 
 function TComAdminApplication.GetInstances: TComAdminInstanceList;
@@ -1025,14 +1061,11 @@ var
   i: Integer;
 begin
   FInstances.Clear;
-  Collection := FCatalogCollection.GetCollection(COLLECTION_NAME_INSTANCES, FKey) as ICatalogCollection;
+  Collection := CatalogCollection.GetCollection(COLLECTION_NAME_INSTANCES, Key) as ICatalogCollection;
   Collection.Populate;
   for i := 0 to Collection.Count - 1 do
   begin
     Instance := TComAdminInstance.Create(FInstances, Collection.Item[i] as ICatalogObject);
-    Instance.FHasRecycled := (Collection.Item[i] as ICatalogObject).Value[PROPERTY_NAME_RECYCLED];
-    Instance.FIsPaused := (Collection.Item[i] as ICatalogObject).Value[PROPERTY_NAME_PAUSED];
-    Instance.FProcessID := VarAsType((Collection.Item[i] as ICatalogObject).Value[PROPERTY_NAME_PROCESSID], varLongWord);
     FInstances.Add(Instance);
   end;
   Result := FInstances;
@@ -1040,102 +1073,102 @@ end;
 
 procedure TComAdminApplication.ReadExtendedProperties;
 begin
-  FGig3SupportEnabled := VarAsType(FCatalogObject.Value[PROPERTY_NAME_3GIG], varBoolean);
-  FAccessChecksLevel := VarAsType(FCatalogObject.Value[PROPERTY_NAME_ACCESS_CHECK_LEVEL], varLongWord);
-  FActivation := VarAsType(FCatalogObject.Value[PROPERTY_NAME_ACTIVATION], varLongWord);
-  FAccessChecksEnabled := VarAsType(FCatalogObject.Value[PROPERTY_NAME_ACCESS_CHECKS], varBoolean);
-  FDirectory := VarToStr(FCatalogObject.Value[PROPERTY_NAME_APPLICATION_DIRECTORY]);
-  FProxy := VarAsType(FCatalogObject.Value[PROPERTY_NAME_APPLICATION_PROXY], varBoolean);
-  FProxyServerName := VarToStr(FCatalogObject.Value[PROPERTY_NAME_PROXY_SERVER_NAME]);
-  FPartitionID := VarToStr(FCatalogObject.Value[PROPERTY_NAME_PARTITION_ID]);
-  FAuthenticationLevel := VarAsType(FCatalogObject.Value[PROPERTY_NAME_AUTHENTICATION], varLongWord);
-  FAuthenticationCapability := VarAsType(FCatalogObject.Value[PROPERTY_NAME_AUTH_CAPABILITY], varLongWord);
-  FChangeable := VarAsType(FCatalogObject.Value[PROPERTY_NAME_CHANGEABLE], varBoolean);
-  FCommandLine := VarToStr(FCatalogObject.Value[PROPERTY_NAME_COMMAND_LINE]);
-  FConcurrentApps := VarAsType(FCatalogObject.Value[PROPERTY_NAME_CONCURRENT_APPS], varLongWord);
-  FCreatedBy := VarToStr(FCatalogObject.Value[PROPERTY_NAME_CREATED_BY]);
-  FCRMEnabled := VarAsType(FCatalogObject.Value[PROPERTY_NAME_CRM_ENABLED], varBoolean);
-  FCRMLogFile := VarToStr(FCatalogObject.Value[PROPERTY_NAME_CRM_LOGFILE]);
-  FDeleteable := VarAsType(FCatalogObject.Value[PROPERTY_NAME_DELETEABLE], varBoolean);
-  FDescription := VarToStr(FCatalogObject.Value[PROPERTY_NAME_DESCRIPTION]);
-  FDumpEnabled := VarAsType(FCatalogObject.Value[PROPERTY_NAME_DUMP_ENABLED], varBoolean);
-  FDumpOnException := VarAsType(FCatalogObject.Value[PROPERTY_NAME_DUMP_EXCEPTION], varBoolean);
-  FDumpOnFailFast := VarAsType(FCatalogObject.Value[PROPERTY_NAME_DUMP_FAILFAST], varBoolean);
-  FDumpPath := VarToStr(FCatalogObject.Value[PROPERTY_NAME_DUMP_PATH]);
-  FEventsEnabled := VarAsType(FCatalogObject.Value[PROPERTY_NAME_EVENTS_ENABLED], varBoolean);
-  FIdentity := VarToStr(FCatalogObject.Value[PROPERTY_NAME_IDENTITY]);
-  FImpersonationLevel := VarAsType(FCatalogObject.Value[PROPERTY_NAME_IMPERSONATION], varLongWord);
-  FIsEnabled := VarAsType(FCatalogObject.Value[PROPERTY_NAME_ENABLED], varBoolean);
-  FIsSystem := VarAsType(FCatalogObject.Value[PROPERTY_NAME_SYSTEM], varBoolean);
-  FMaxDumpCount := VarAsType(FCatalogObject.Value[PROPERTY_NAME_MAX_DUMPS], varLongWord);
-  FQCAuthenticateMsgs := VarAsType(FCatalogObject.Value[PROPERTY_NAME_QC_AUTHENTICATE], varLongWord);
-  FQCListenerMaxThreads := VarAsType(FCatalogObject.Value[PROPERTY_NAME_QC_MAXTHREADS], varLongWord);
-  FQueueListenerEnabled := VarAsType(FCatalogObject.Value[PROPERTY_NAME_QUEUE_LISTENER], varBoolean);
-  FQueuingEnabled := VarAsType(FCatalogObject.Value[PROPERTY_NAME_QUEUING_ENABLED], varBoolean);
-  FRecycleActivationLimit := VarAsType(FCatalogObject.Value[PROPERTY_NAME_RECYCLE_ACTIVATION], varLongWord);
-  FRecycleCallLimit := VarAsType(FCatalogObject.Value[PROPERTY_NAME_RECYCLE_CALL_LIMIT], varLongWord);
-  FRecycleExpirationTimeout := VarAsType(FCatalogObject.Value[PROPERTY_NAME_RECYCLE_EXPIRATION], varLongWord);
-  FRecycleLifetimeLimit := VarAsType(FCatalogObject.Value[PROPERTY_NAME_RECYCLE_LIFETIME_LIMIT], varLongWord);
-  FRecycleMemoryLimit := VarAsType(FCatalogObject.Value[PROPERTY_NAME_RECYCLE_MEMORY_LIMIT], varLongWord);
-  FReplicable := VarAsType(FCatalogObject.Value[PROPERTY_NAME_REPLICABLE], varBoolean);
-  FRunForever := VarAsType(FCatalogObject.Value[PROPERTY_NAME_RUN_FOREVER], varBoolean);
-  FServiceName := VarToStr(FCatalogObject.Value[PROPERTY_NAME_SERVICE_NAME]);
-  FShutdownAfter := VarAsType(FCatalogObject.Value[PROPERTY_NAME_SHUTDOWN], varLongWord);
-  FSoapActivated := VarAsType(FCatalogObject.Value[PROPERTY_NAME_SOAP_ACTIVATED], varBoolean);
-  FSoapBaseUrl := VarToStr(FCatalogObject.Value[PROPERTY_NAME_SOAP_BASE_URL]);
-  FSoapMailTo := VarToStr(FCatalogObject.Value[PROPERTY_NAME_SOAP_MAILTO]);
-  FSoapVRoot := VarToStr(FCatalogObject.Value[PROPERTY_NAME_SOAP_VROOT]);
-  FSRPEnabled := VarAsType(FCatalogObject.Value[PROPERTY_NAME_SRP_ENABLED], varBoolean);
-  FSRPTrustLevel := VarAsType(FCatalogObject.Value[PROPERTY_NAME_SRP_TRUSTLEVEL], varLongWord);
+  FGig3SupportEnabled := VarAsType(CatalogObject.Value[PROPERTY_NAME_3GIG], varBoolean);
+  FAccessChecksLevel := VarAsType(CatalogObject.Value[PROPERTY_NAME_ACCESS_CHECK_LEVEL], varLongWord);
+  FActivation := VarAsType(CatalogObject.Value[PROPERTY_NAME_ACTIVATION], varLongWord);
+  FAccessChecksEnabled := VarAsType(CatalogObject.Value[PROPERTY_NAME_ACCESS_CHECKS], varBoolean);
+  FDirectory := VarToStr(CatalogObject.Value[PROPERTY_NAME_APPLICATION_DIRECTORY]);
+  FProxy := VarAsType(CatalogObject.Value[PROPERTY_NAME_APPLICATION_PROXY], varBoolean);
+  FProxyServerName := VarToStr(CatalogObject.Value[PROPERTY_NAME_PROXY_SERVER_NAME]);
+  FPartitionID := VarToStr(CatalogObject.Value[PROPERTY_NAME_PARTITION_ID]);
+  FAuthenticationLevel := VarAsType(CatalogObject.Value[PROPERTY_NAME_AUTHENTICATION], varLongWord);
+  FAuthenticationCapability := VarAsType(CatalogObject.Value[PROPERTY_NAME_AUTH_CAPABILITY], varLongWord);
+  FChangeable := VarAsType(CatalogObject.Value[PROPERTY_NAME_CHANGEABLE], varBoolean);
+  FCommandLine := VarToStr(CatalogObject.Value[PROPERTY_NAME_COMMAND_LINE]);
+  FConcurrentApps := VarAsType(CatalogObject.Value[PROPERTY_NAME_CONCURRENT_APPS], varLongWord);
+  FCreatedBy := VarToStr(CatalogObject.Value[PROPERTY_NAME_CREATED_BY]);
+  FCRMEnabled := VarAsType(CatalogObject.Value[PROPERTY_NAME_CRM_ENABLED], varBoolean);
+  FCRMLogFile := VarToStr(CatalogObject.Value[PROPERTY_NAME_CRM_LOGFILE]);
+  FDeleteable := VarAsType(CatalogObject.Value[PROPERTY_NAME_DELETEABLE], varBoolean);
+  FDescription := VarToStr(CatalogObject.Value[PROPERTY_NAME_DESCRIPTION]);
+  FDumpEnabled := VarAsType(CatalogObject.Value[PROPERTY_NAME_DUMP_ENABLED], varBoolean);
+  FDumpOnException := VarAsType(CatalogObject.Value[PROPERTY_NAME_DUMP_EXCEPTION], varBoolean);
+  FDumpOnFailFast := VarAsType(CatalogObject.Value[PROPERTY_NAME_DUMP_FAILFAST], varBoolean);
+  FDumpPath := VarToStr(CatalogObject.Value[PROPERTY_NAME_DUMP_PATH]);
+  FEventsEnabled := VarAsType(CatalogObject.Value[PROPERTY_NAME_EVENTS_ENABLED], varBoolean);
+  FIdentity := VarToStr(CatalogObject.Value[PROPERTY_NAME_IDENTITY]);
+  FImpersonationLevel := VarAsType(CatalogObject.Value[PROPERTY_NAME_IMPERSONATION], varLongWord);
+  FIsEnabled := VarAsType(CatalogObject.Value[PROPERTY_NAME_ENABLED], varBoolean);
+  FIsSystem := VarAsType(CatalogObject.Value[PROPERTY_NAME_SYSTEM], varBoolean);
+  FMaxDumpCount := VarAsType(CatalogObject.Value[PROPERTY_NAME_MAX_DUMPS], varLongWord);
+  FQCAuthenticateMsgs := VarAsType(CatalogObject.Value[PROPERTY_NAME_QC_AUTHENTICATE], varLongWord);
+  FQCListenerMaxThreads := VarAsType(CatalogObject.Value[PROPERTY_NAME_QC_MAXTHREADS], varLongWord);
+  FQueueListenerEnabled := VarAsType(CatalogObject.Value[PROPERTY_NAME_QUEUE_LISTENER], varBoolean);
+  FQueuingEnabled := VarAsType(CatalogObject.Value[PROPERTY_NAME_QUEUING_ENABLED], varBoolean);
+  FRecycleActivationLimit := VarAsType(CatalogObject.Value[PROPERTY_NAME_RECYCLE_ACTIVATION], varLongWord);
+  FRecycleCallLimit := VarAsType(CatalogObject.Value[PROPERTY_NAME_RECYCLE_CALL_LIMIT], varLongWord);
+  FRecycleExpirationTimeout := VarAsType(CatalogObject.Value[PROPERTY_NAME_RECYCLE_EXPIRATION], varLongWord);
+  FRecycleLifetimeLimit := VarAsType(CatalogObject.Value[PROPERTY_NAME_RECYCLE_LIFETIME_LIMIT], varLongWord);
+  FRecycleMemoryLimit := VarAsType(CatalogObject.Value[PROPERTY_NAME_RECYCLE_MEMORY_LIMIT], varLongWord);
+  FReplicable := VarAsType(CatalogObject.Value[PROPERTY_NAME_REPLICABLE], varBoolean);
+  FRunForever := VarAsType(CatalogObject.Value[PROPERTY_NAME_RUN_FOREVER], varBoolean);
+  FServiceName := VarToStr(CatalogObject.Value[PROPERTY_NAME_SERVICE_NAME]);
+  FShutdownAfter := VarAsType(CatalogObject.Value[PROPERTY_NAME_SHUTDOWN], varLongWord);
+  FSoapActivated := VarAsType(CatalogObject.Value[PROPERTY_NAME_SOAP_ACTIVATED], varBoolean);
+  FSoapBaseUrl := VarToStr(CatalogObject.Value[PROPERTY_NAME_SOAP_BASE_URL]);
+  FSoapMailTo := VarToStr(CatalogObject.Value[PROPERTY_NAME_SOAP_MAILTO]);
+  FSoapVRoot := VarToStr(CatalogObject.Value[PROPERTY_NAME_SOAP_VROOT]);
+  FSRPEnabled := VarAsType(CatalogObject.Value[PROPERTY_NAME_SRP_ENABLED], varBoolean);
+  FSRPTrustLevel := VarAsType(CatalogObject.Value[PROPERTY_NAME_SRP_TRUSTLEVEL], varLongWord);
 end;
 
 procedure TComAdminApplication.SetAccessChecksEnabled(const Value: Boolean);
 begin
   FAccessChecksEnabled := Value;
-  if not FCatalogObject.IsPropertyReadOnly(PROPERTY_NAME_ACCESS_CHECKS) then
-    FCatalogObject.Value[PROPERTY_NAME_ACCESS_CHECKS] := Value;
+  if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_ACCESS_CHECKS) then
+    CatalogObject.Value[PROPERTY_NAME_ACCESS_CHECKS] := Value;
 end;
 
 procedure TComAdminApplication.SetAccessChecksLevel(const Value: TCOMAdminAccessChecksLevelOptions);
 begin
   FAccessChecksLevel := Value;
-  if not FCatalogObject.IsPropertyReadOnly(PROPERTY_NAME_ACCESS_CHECK_LEVEL) then
-    FCatalogObject.Value[PROPERTY_NAME_ACCESS_CHECK_LEVEL] := Value;
+  if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_ACCESS_CHECK_LEVEL) then
+    CatalogObject.Value[PROPERTY_NAME_ACCESS_CHECK_LEVEL] := Value;
 end;
 
 procedure TComAdminApplication.SetActivation(const Value: TCOMAdminApplicationActivation);
 begin
   FActivation := Value;
-  if not FCatalogObject.IsPropertyReadOnly(PROPERTY_NAME_ACTIVATION) then
-    FCatalogObject.Value[PROPERTY_NAME_ACTIVATION] := Value;
+  if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_ACTIVATION) then
+    CatalogObject.Value[PROPERTY_NAME_ACTIVATION] := Value;
 end;
 
 procedure TComAdminApplication.SetAuthenticationCapability(const Value: TCOMAdminAuthenticationCapability);
 begin
   FAuthenticationCapability := Value;
-  if not FCatalogObject.IsPropertyReadOnly(PROPERTY_NAME_AUTH_CAPABILITY) then
-    FCatalogObject.Value[PROPERTY_NAME_AUTH_CAPABILITY] := Value;
+  if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_AUTH_CAPABILITY) then
+    CatalogObject.Value[PROPERTY_NAME_AUTH_CAPABILITY] := Value;
 end;
 
 procedure TComAdminApplication.SetAuthenticationLevel(const Value: TCOMAdminAuthenticationLevel);
 begin
   FAuthenticationLevel := Value;
-  if not FCatalogObject.IsPropertyReadOnly(PROPERTY_NAME_AUTHENTICATION) then
-    FCatalogObject.Value[PROPERTY_NAME_AUTHENTICATION] := Value;
+  if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_AUTHENTICATION) then
+    CatalogObject.Value[PROPERTY_NAME_AUTHENTICATION] := Value;
 end;
 
 procedure TComAdminApplication.SetChangeable(const Value: Boolean);
 begin
   FChangeable := Value;
-  if not FCatalogObject.IsPropertyReadOnly(PROPERTY_NAME_CHANGEABLE) then
-    FCatalogObject.Value[PROPERTY_NAME_CHANGEABLE] := Value;
+  if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_CHANGEABLE) then
+    CatalogObject.Value[PROPERTY_NAME_CHANGEABLE] := Value;
 end;
 
 procedure TComAdminApplication.SetCommandLine(const Value: string);
 begin
   FCommandLine := Value;
-  if not FCatalogObject.IsPropertyReadOnly(PROPERTY_NAME_COMMAND_LINE) then
-    FCatalogObject.Value[PROPERTY_NAME_COMMAND_LINE] := Value;
+  if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_COMMAND_LINE) then
+    CatalogObject.Value[PROPERTY_NAME_COMMAND_LINE] := Value;
 end;
 
 procedure TComAdminApplication.SetConcurrentApps(const Value: Cardinal);
@@ -1143,114 +1176,114 @@ begin
   if InternalCheckRange(1, 1048576, Value) then
   begin
     FConcurrentApps := Value;
-    if not FCatalogObject.IsPropertyReadOnly(PROPERTY_NAME_CONCURRENT_APPS) then
-      FCatalogObject.Value[PROPERTY_NAME_CONCURRENT_APPS] := Value;
+    if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_CONCURRENT_APPS) then
+      CatalogObject.Value[PROPERTY_NAME_CONCURRENT_APPS] := Value;
   end;
 end;
 
 procedure TComAdminApplication.SetCreatedBy(const Value: string);
 begin
   FCreatedBy := Value;
-  if not FCatalogObject.IsPropertyReadOnly(PROPERTY_NAME_CREATED_BY) then
-    FCatalogObject.Value[PROPERTY_NAME_CREATED_BY] := Value;
+  if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_CREATED_BY) then
+    CatalogObject.Value[PROPERTY_NAME_CREATED_BY] := Value;
 end;
 
 procedure TComAdminApplication.SetCRMEnabled(const Value: Boolean);
 begin
   FCRMEnabled := Value;
-  if not FCatalogObject.IsPropertyReadOnly(PROPERTY_NAME_CRM_ENABLED) then
-    FCatalogObject.Value[PROPERTY_NAME_CRM_ENABLED] := Value;
+  if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_CRM_ENABLED) then
+    CatalogObject.Value[PROPERTY_NAME_CRM_ENABLED] := Value;
 end;
 
 procedure TComAdminApplication.SetCRMLogFile(const Value: string);
 begin
   FCRMLogFile := Value;
-  if not FCatalogObject.IsPropertyReadOnly(PROPERTY_NAME_CRM_LOGFILE) then
-    FCatalogObject.Value[PROPERTY_NAME_CRM_LOGFILE] := Value;
+  if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_CRM_LOGFILE) then
+    CatalogObject.Value[PROPERTY_NAME_CRM_LOGFILE] := Value;
 end;
 
 procedure TComAdminApplication.SetDeleteable(const Value: Boolean);
 begin
   FDeleteable := Value;
-  if not FCatalogObject.IsPropertyReadOnly(PROPERTY_NAME_DELETEABLE) then
-    FCatalogObject.Value[PROPERTY_NAME_DELETEABLE] := Value;
+  if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_DELETEABLE) then
+    CatalogObject.Value[PROPERTY_NAME_DELETEABLE] := Value;
 end;
 
 procedure TComAdminApplication.SetDescription(const Value: string);
 begin
   FDescription := Value;
-  if not FCatalogObject.IsPropertyReadOnly(PROPERTY_NAME_DESCRIPTION) then
-    FCatalogObject.Value[PROPERTY_NAME_DESCRIPTION] := Value;
+  if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_DESCRIPTION) then
+    CatalogObject.Value[PROPERTY_NAME_DESCRIPTION] := Value;
 end;
 
 procedure TComAdminApplication.SetDirectory(const Value: string);
 begin
   FDirectory := Value;
-  if not FCatalogObject.IsPropertyReadOnly(PROPERTY_NAME_APPLICATION_DIRECTORY) then
-    FCatalogObject.Value[PROPERTY_NAME_APPLICATION_DIRECTORY] := Value;
+  if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_APPLICATION_DIRECTORY) then
+    CatalogObject.Value[PROPERTY_NAME_APPLICATION_DIRECTORY] := Value;
 end;
 
 procedure TComAdminApplication.SetDumpEnabled(const Value: Boolean);
 begin
   FDumpEnabled := Value;
-  if not FCatalogObject.IsPropertyReadOnly(PROPERTY_NAME_DUMP_ENABLED) then
-    FCatalogObject.Value[PROPERTY_NAME_DUMP_ENABLED] := Value;
+  if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_DUMP_ENABLED) then
+    CatalogObject.Value[PROPERTY_NAME_DUMP_ENABLED] := Value;
 end;
 
 procedure TComAdminApplication.SetDumpOnException(const Value: Boolean);
 begin
   FDumpOnException := Value;
-  if not FCatalogObject.IsPropertyReadOnly(PROPERTY_NAME_DUMP_EXCEPTION) then
-    FCatalogObject.Value[PROPERTY_NAME_DUMP_EXCEPTION] := Value;
+  if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_DUMP_EXCEPTION) then
+    CatalogObject.Value[PROPERTY_NAME_DUMP_EXCEPTION] := Value;
 end;
 
 procedure TComAdminApplication.SetDumpOnFailFast(const Value: Boolean);
 begin
   FDumpOnFailFast := Value;
-  if not FCatalogObject.IsPropertyReadOnly(PROPERTY_NAME_DUMP_FAILFAST) then
-    FCatalogObject.Value[PROPERTY_NAME_DUMP_FAILFAST] := Value;
+  if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_DUMP_FAILFAST) then
+    CatalogObject.Value[PROPERTY_NAME_DUMP_FAILFAST] := Value;
 end;
 
 procedure TComAdminApplication.SetDumpPath(const Value: string);
 begin
   FDumpPath := Value;
-  if not FCatalogObject.IsPropertyReadOnly(PROPERTY_NAME_DUMP_PATH) then
-    FCatalogObject.Value[PROPERTY_NAME_DUMP_PATH] := Value;
+  if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_DUMP_PATH) then
+    CatalogObject.Value[PROPERTY_NAME_DUMP_PATH] := Value;
 end;
 
 procedure TComAdminApplication.SetEventsEnabled(const Value: Boolean);
 begin
   FEventsEnabled := Value;
-  if not FCatalogObject.IsPropertyReadOnly(PROPERTY_NAME_EVENTS_ENABLED) then
-    FCatalogObject.Value[PROPERTY_NAME_EVENTS_ENABLED] := Value;
+  if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_EVENTS_ENABLED) then
+    CatalogObject.Value[PROPERTY_NAME_EVENTS_ENABLED] := Value;
 end;
 
 procedure TComAdminApplication.SetGig3SupportEnabled(const Value: Boolean);
 begin
   FGig3SupportEnabled := Value;
-  if not FCatalogObject.IsPropertyReadOnly(PROPERTY_NAME_3GIG) then
-    FCatalogObject.Value[PROPERTY_NAME_3GIG] := Value;
+  if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_3GIG) then
+    CatalogObject.Value[PROPERTY_NAME_3GIG] := Value;
 end;
 
 procedure TComAdminApplication.SetIdentity(const Value: string);
 begin
   FIdentity := Value;
-  if not FCatalogObject.IsPropertyReadOnly(PROPERTY_NAME_IDENTITY) then
-    FCatalogObject.Value[PROPERTY_NAME_IDENTITY] := Value;
+  if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_IDENTITY) then
+    CatalogObject.Value[PROPERTY_NAME_IDENTITY] := Value;
 end;
 
 procedure TComAdminApplication.SetImpersonationLevel(const Value: TCOMAdminImpersonationLevel);
 begin
   FImpersonationLevel := Value;
-  if not FCatalogObject.IsPropertyReadOnly(PROPERTY_NAME_IMPERSONATION) then
-    FCatalogObject.Value[PROPERTY_NAME_IMPERSONATION] := Value;
+  if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_IMPERSONATION) then
+    CatalogObject.Value[PROPERTY_NAME_IMPERSONATION] := Value;
 end;
 
 procedure TComAdminApplication.SetIsEnabled(const Value: Boolean);
 begin
   FIsEnabled := Value;
-  if not FCatalogObject.IsPropertyReadOnly(PROPERTY_NAME_ENABLED) then
-    FCatalogObject.Value[PROPERTY_NAME_ENABLED] := Value;
+  if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_ENABLED) then
+    CatalogObject.Value[PROPERTY_NAME_ENABLED] := Value;
 end;
 
 procedure TComAdminApplication.SetMaxDumpCount(const Value: Cardinal);
@@ -1258,8 +1291,8 @@ begin
   if InternalCheckRange(1, 200, Value) then
   begin
     FMaxDumpCount := Value;
-    if not FCatalogObject.IsPropertyReadOnly(PROPERTY_NAME_MAX_DUMPS) then
-      FCatalogObject.Value[PROPERTY_NAME_MAX_DUMPS] := Value;
+    if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_MAX_DUMPS) then
+      CatalogObject.Value[PROPERTY_NAME_MAX_DUMPS] := Value;
   end;
 end;
 
@@ -1270,29 +1303,29 @@ end;
 
 procedure TComAdminApplication.SetPassword(const Value: string);
 begin
-  if not FCatalogObject.IsPropertyReadOnly(PROPERTY_NAME_PASSWORD) then
-    FCatalogObject.Value[PROPERTY_NAME_PASSWORD] := Value;
+  if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_PASSWORD) then
+    CatalogObject.Value[PROPERTY_NAME_PASSWORD] := Value;
 end;
 
 procedure TComAdminApplication.SetProxy(const Value: Boolean);
 begin
   FProxy := Value;
-  if not FCatalogObject.IsPropertyReadOnly(PROPERTY_NAME_APPLICATION_PROXY) then
-    FCatalogObject.Value[PROPERTY_NAME_APPLICATION_PROXY] := Value;
+  if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_APPLICATION_PROXY) then
+    CatalogObject.Value[PROPERTY_NAME_APPLICATION_PROXY] := Value;
 end;
 
 procedure TComAdminApplication.SetProxyServerName(const Value: string);
 begin
   FProxyServerName := Value;
-  if not FCatalogObject.IsPropertyReadOnly(PROPERTY_NAME_PROXY_SERVER_NAME) then
-    FCatalogObject.Value[PROPERTY_NAME_PROXY_SERVER_NAME] := Value;
+  if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_PROXY_SERVER_NAME) then
+    CatalogObject.Value[PROPERTY_NAME_PROXY_SERVER_NAME] := Value;
 end;
 
 procedure TComAdminApplication.SetQCAuthenticateMsgs(const Value: TCOMAdminQCAuthenticateMsgs);
 begin
   FQCAuthenticateMsgs := Value;
-  if not FCatalogObject.IsPropertyReadOnly(PROPERTY_NAME_QC_AUTHENTICATE) then
-    FCatalogObject.Value[PROPERTY_NAME_QC_AUTHENTICATE] := Value;
+  if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_QC_AUTHENTICATE) then
+    CatalogObject.Value[PROPERTY_NAME_QC_AUTHENTICATE] := Value;
 end;
 
 procedure TComAdminApplication.SetQCListenerMaxThreads(const Value: Cardinal);
@@ -1300,23 +1333,23 @@ begin
   if InternalCheckRange(0, 1000, Value) then
   begin
     FQCListenerMaxThreads := Value;
-    if not FCatalogObject.IsPropertyReadOnly(PROPERTY_NAME_QC_MAXTHREADS) then
-      FCatalogObject.Value[PROPERTY_NAME_QC_MAXTHREADS] := Value;
+    if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_QC_MAXTHREADS) then
+      CatalogObject.Value[PROPERTY_NAME_QC_MAXTHREADS] := Value;
   end;
 end;
 
 procedure TComAdminApplication.SetQueueListenerEnabled(const Value: Boolean);
 begin
   FQueueListenerEnabled := Value;
-  if not FCatalogObject.IsPropertyReadOnly(PROPERTY_NAME_QUEUE_LISTENER) then
-    FCatalogObject.Value[PROPERTY_NAME_QUEUE_LISTENER] := Value;
+  if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_QUEUE_LISTENER) then
+    CatalogObject.Value[PROPERTY_NAME_QUEUE_LISTENER] := Value;
 end;
 
 procedure TComAdminApplication.SetQueuingEnabled(const Value: Boolean);
 begin
   FQueuingEnabled := Value;
-  if not FCatalogObject.IsPropertyReadOnly(PROPERTY_NAME_QUEUING_ENABLED) then
-    FCatalogObject.Value[PROPERTY_NAME_QUEUING_ENABLED] := Value;
+  if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_QUEUING_ENABLED) then
+    CatalogObject.Value[PROPERTY_NAME_QUEUING_ENABLED] := Value;
 end;
 
 procedure TComAdminApplication.SetRecycleActivationLimit(const Value: Cardinal);
@@ -1324,8 +1357,8 @@ begin
   if InternalCheckRange(0, 1048576, Value) then
   begin
     FRecycleActivationLimit := Value;
-    if not FCatalogObject.IsPropertyReadOnly(PROPERTY_NAME_RECYCLE_ACTIVATION) then
-      FCatalogObject.Value[PROPERTY_NAME_RECYCLE_ACTIVATION] := Value;
+    if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_RECYCLE_ACTIVATION) then
+      CatalogObject.Value[PROPERTY_NAME_RECYCLE_ACTIVATION] := Value;
   end;
 end;
 
@@ -1334,8 +1367,8 @@ begin
   if InternalCheckRange(0, 1048576, Value) then
   begin
     FRecycleCallLimit := Value;
-    if not FCatalogObject.IsPropertyReadOnly(PROPERTY_NAME_RECYCLE_CALL_LIMIT) then
-      FCatalogObject.Value[PROPERTY_NAME_RECYCLE_CALL_LIMIT] := Value;
+    if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_RECYCLE_CALL_LIMIT) then
+      CatalogObject.Value[PROPERTY_NAME_RECYCLE_CALL_LIMIT] := Value;
   end;
 end;
 
@@ -1344,8 +1377,8 @@ begin
   if InternalCheckRange(1, 1440, Value) then
   begin
     FRecycleExpirationTimeout := Value;
-    if not FCatalogObject.IsPropertyReadOnly(PROPERTY_NAME_RECYCLE_EXPIRATION) then
-      FCatalogObject.Value[PROPERTY_NAME_RECYCLE_EXPIRATION] := Value;
+    if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_RECYCLE_EXPIRATION) then
+      CatalogObject.Value[PROPERTY_NAME_RECYCLE_EXPIRATION] := Value;
   end;
 end;
 
@@ -1354,8 +1387,8 @@ begin
   if InternalCheckRange(0, 30240, Value) then
   begin
     FRecycleLifetimeLimit := Value;
-    if not FCatalogObject.IsPropertyReadOnly(PROPERTY_NAME_RECYCLE_LIFETIME_LIMIT) then
-      FCatalogObject.Value[PROPERTY_NAME_RECYCLE_LIFETIME_LIMIT] := Value;
+    if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_RECYCLE_LIFETIME_LIMIT) then
+      CatalogObject.Value[PROPERTY_NAME_RECYCLE_LIFETIME_LIMIT] := Value;
   end;
 end;
 
@@ -1364,23 +1397,23 @@ begin
   if InternalCheckRange(0, 1048576, Value) then
   begin
     FRecycleMemoryLimit := Value;
-    if not FCatalogObject.IsPropertyReadOnly(PROPERTY_NAME_RECYCLE_MEMORY_LIMIT) then
-      FCatalogObject.Value[PROPERTY_NAME_RECYCLE_MEMORY_LIMIT] := Value;
+    if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_RECYCLE_MEMORY_LIMIT) then
+      CatalogObject.Value[PROPERTY_NAME_RECYCLE_MEMORY_LIMIT] := Value;
   end;
 end;
 
 procedure TComAdminApplication.SetReplicable(const Value: Boolean);
 begin
   FReplicable := Value;
-  if not FCatalogObject.IsPropertyReadOnly(PROPERTY_NAME_REPLICABLE) then
-    FCatalogObject.Value[PROPERTY_NAME_REPLICABLE] := Value;
+  if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_REPLICABLE) then
+    CatalogObject.Value[PROPERTY_NAME_REPLICABLE] := Value;
 end;
 
 procedure TComAdminApplication.SetRunForever(const Value: Boolean);
 begin
   FRunForever := Value;
-  if not FCatalogObject.IsPropertyReadOnly(PROPERTY_NAME_RUN_FOREVER) then
-    FCatalogObject.Value[PROPERTY_NAME_RUN_FOREVER] := Value;
+  if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_RUN_FOREVER) then
+    CatalogObject.Value[PROPERTY_NAME_RUN_FOREVER] := Value;
 end;
 
 procedure TComAdminApplication.SetServiceName(const Value: string);
@@ -1393,51 +1426,51 @@ begin
   if InternalCheckRange(0, 1440, Value) then
   begin
     FShutdownAfter := Value;
-    if not FCatalogObject.IsPropertyReadOnly(PROPERTY_NAME_SHUTDOWN) then
-      FCatalogObject.Value[PROPERTY_NAME_SHUTDOWN] := Value;
+    if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_SHUTDOWN) then
+      CatalogObject.Value[PROPERTY_NAME_SHUTDOWN] := Value;
   end;
 end;
 
 procedure TComAdminApplication.SetSoapActivated(const Value: Boolean);
 begin
   FSoapActivated := Value;
-  if not FCatalogObject.IsPropertyReadOnly(PROPERTY_NAME_SOAP_ACTIVATED) then
-    FCatalogObject.Value[PROPERTY_NAME_SOAP_ACTIVATED] := Value;
+  if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_SOAP_ACTIVATED) then
+    CatalogObject.Value[PROPERTY_NAME_SOAP_ACTIVATED] := Value;
 end;
 
 procedure TComAdminApplication.SetSoapBaseUrl(const Value: string);
 begin
   FSoapBaseUrl := Value;
-  if not FCatalogObject.IsPropertyReadOnly(PROPERTY_NAME_SOAP_BASE_URL) then
-    FCatalogObject.Value[PROPERTY_NAME_SOAP_BASE_URL] := Value;
+  if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_SOAP_BASE_URL) then
+    CatalogObject.Value[PROPERTY_NAME_SOAP_BASE_URL] := Value;
 end;
 
 procedure TComAdminApplication.SetSoapMailTo(const Value: string);
 begin
   FSoapMailTo := Value;
-  if not FCatalogObject.IsPropertyReadOnly(PROPERTY_NAME_SOAP_MAILTO) then
-    FCatalogObject.Value[PROPERTY_NAME_SOAP_MAILTO] := Value;
+  if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_SOAP_MAILTO) then
+    CatalogObject.Value[PROPERTY_NAME_SOAP_MAILTO] := Value;
 end;
 
 procedure TComAdminApplication.SetSoapVRoot(const Value: string);
 begin
   FSoapVRoot := Value;
-  if not FCatalogObject.IsPropertyReadOnly(PROPERTY_NAME_SOAP_VROOT) then
-    FCatalogObject.Value[PROPERTY_NAME_SOAP_VROOT] := Value;
+  if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_SOAP_VROOT) then
+    CatalogObject.Value[PROPERTY_NAME_SOAP_VROOT] := Value;
 end;
 
 procedure TComAdminApplication.SetSRPEnabled(const Value: Boolean);
 begin
   FSRPEnabled := Value;
-  if not FCatalogObject.IsPropertyReadOnly(PROPERTY_NAME_SRP_ENABLED) then
-    FCatalogObject.Value[PROPERTY_NAME_SRP_ENABLED] := Value;
+  if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_SRP_ENABLED) then
+    CatalogObject.Value[PROPERTY_NAME_SRP_ENABLED] := Value;
 end;
 
 procedure TComAdminApplication.SetSRPTrustLevel(const Value: TCOMAdminSRPTrustLevel);
 begin
   FSRPTrustLevel := Value;
-  if not FCatalogObject.IsPropertyReadOnly(PROPERTY_NAME_SRP_TRUSTLEVEL) then
-    FCatalogObject.Value[PROPERTY_NAME_SRP_TRUSTLEVEL] := Value;
+  if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_SRP_TRUSTLEVEL) then
+    CatalogObject.Value[PROPERTY_NAME_SRP_TRUSTLEVEL] := Value;
 end;
 
 procedure TComAdminApplication.SyncComponents(ASourceApplication: TCOMAdminApplication);
@@ -1517,29 +1550,29 @@ end;
 
 procedure TComAdminComputer.ReadExtendedProperties;
 begin
-  FApplicationProxyRSN := VarToStr(FCatalogObject.Value[PROPERTY_NAME_PROXY_RSN]);
-  FCISEnabled := VarAsType(FCatalogObject.Value[PROPERTY_NAME_CIS_ENABLED], varBoolean);
-  FDCOMEnabled := VarAsType(FCatalogObject.Value[PROPERTY_NAME_DCOM_ENABLED], varBoolean);
-  FAuthenticationLevel := VarAsType(FCatalogObject.Value[PROPERTY_NAME_DEFAULT_AUTHENTICATION], varLongWord);
-  FImpersonationLevel := VarAsType(FCatalogObject.Value[PROPERTY_NAME_DEFAULT_IMPERSONATION], varLongWord);
-  FDefaultToInternetPorts := VarAsType(FCatalogObject.Value[PROPERTY_NAME_DEFAULT_TO_INTERNET], varBoolean);
-  FDescription := VarToStr(FCatalogObject.Value[PROPERTY_NAME_DESCRIPTION]);
-  FDSPartitionLookupEnabled := VarAsType(FCatalogObject.Value[PROPERTY_NAME_DS_PARTITION_LOOKUP], varBoolean);
-  FInternetPortsListed := VarAsType(FCatalogObject.Value[PROPERTY_NAME_INTERNET_PORTS], varBoolean);
-  FIsRouter := VarAsType(FCatalogObject.Value[PROPERTY_NAME_IS_ROUTER], varBoolean);
-  FLoadBalancingCLSID := VarToStr(FCatalogObject.Value[PROPERTY_NAME_LOAD_BALANCING_ID]);
-  FLocalPartitionLookupEnabled := VarAsType(FCatalogObject.Value[PROPERTY_NAME_IS_ROUTER], varBoolean);
-  FOperatingSystem := VarAsType(FCatalogObject.Value[PROPERTY_NAME_OPERATING_SYSTEM], varLongWord);
-  FPartitionsEnabled := VarAsType(FCatalogObject.Value[PROPERTY_NAME_PARTITIONS_ENABLED], varBoolean);
-  FPorts := VarToStr(FCatalogObject.Value[PROPERTY_NAME_PORTS]);
-  FResourcePoolingEnabled := VarAsType(FCatalogObject.Value[PROPERTY_NAME_RESOURCE_POOLING], varBoolean);
+  FApplicationProxyRSN := VarToStr(CatalogObject.Value[PROPERTY_NAME_PROXY_RSN]);
+  FCISEnabled := VarAsType(CatalogObject.Value[PROPERTY_NAME_CIS_ENABLED], varBoolean);
+  FDCOMEnabled := VarAsType(CatalogObject.Value[PROPERTY_NAME_DCOM_ENABLED], varBoolean);
+  FAuthenticationLevel := VarAsType(CatalogObject.Value[PROPERTY_NAME_DEFAULT_AUTHENTICATION], varLongWord);
+  FImpersonationLevel := VarAsType(CatalogObject.Value[PROPERTY_NAME_DEFAULT_IMPERSONATION], varLongWord);
+  FDefaultToInternetPorts := VarAsType(CatalogObject.Value[PROPERTY_NAME_DEFAULT_TO_INTERNET], varBoolean);
+  FDescription := VarToStr(CatalogObject.Value[PROPERTY_NAME_DESCRIPTION]);
+  FDSPartitionLookupEnabled := VarAsType(CatalogObject.Value[PROPERTY_NAME_DS_PARTITION_LOOKUP], varBoolean);
+  FInternetPortsListed := VarAsType(CatalogObject.Value[PROPERTY_NAME_INTERNET_PORTS], varBoolean);
+  FIsRouter := VarAsType(CatalogObject.Value[PROPERTY_NAME_IS_ROUTER], varBoolean);
+  FLoadBalancingCLSID := VarToStr(CatalogObject.Value[PROPERTY_NAME_LOAD_BALANCING_ID]);
+  FLocalPartitionLookupEnabled := VarAsType(CatalogObject.Value[PROPERTY_NAME_IS_ROUTER], varBoolean);
+  FOperatingSystem := VarAsType(CatalogObject.Value[PROPERTY_NAME_OPERATING_SYSTEM], varLongWord);
+  FPartitionsEnabled := VarAsType(CatalogObject.Value[PROPERTY_NAME_PARTITIONS_ENABLED], varBoolean);
+  FPorts := VarToStr(CatalogObject.Value[PROPERTY_NAME_PORTS]);
+  FResourcePoolingEnabled := VarAsType(CatalogObject.Value[PROPERTY_NAME_RESOURCE_POOLING], varBoolean);
   if FCISEnabled then // property only available if CIS is enabled
-    FRPCProxyEnabled := VarAsType(FCatalogObject.Value[PROPERTY_NAME_RPC_PROXY_ENABLED], varBoolean);
-  FSecureReferencesEnabled := VarAsType(FCatalogObject.Value[PROPERTY_NAME_SECURE_REFERENCES], varBoolean);
-  FSecurityTrackingEnabled := VarAsType(FCatalogObject.Value[PROPERTY_NAME_SECURE_TRACKING], varBoolean);
-  FSRPActivateAsActivatorChecks := VarAsType(FCatalogObject.Value[PROPERTY_NAME_SRP_ACTIVATE_CHECKS], varBoolean);
-  FSRPRunningObjectChecks := VarAsType(FCatalogObject.Value[PROPERTY_NAME_SRP_OBJECTS_CHECK], varBoolean);
-  FTransactionTimeout := VarAsType(FCatalogObject.Value[PROPERTY_NAME_TRANSACTION_TIMEOUT], varLongWord);
+    FRPCProxyEnabled := VarAsType(CatalogObject.Value[PROPERTY_NAME_RPC_PROXY_ENABLED], varBoolean);
+  FSecureReferencesEnabled := VarAsType(CatalogObject.Value[PROPERTY_NAME_SECURE_REFERENCES], varBoolean);
+  FSecurityTrackingEnabled := VarAsType(CatalogObject.Value[PROPERTY_NAME_SECURE_TRACKING], varBoolean);
+  FSRPActivateAsActivatorChecks := VarAsType(CatalogObject.Value[PROPERTY_NAME_SRP_ACTIVATE_CHECKS], varBoolean);
+  FSRPRunningObjectChecks := VarAsType(CatalogObject.Value[PROPERTY_NAME_SRP_OBJECTS_CHECK], varBoolean);
+  FTransactionTimeout := VarAsType(CatalogObject.Value[PROPERTY_NAME_TRANSACTION_TIMEOUT], varLongWord);
 end;
 
 procedure TComAdminComputer.SetTransactionTimeout(const Value: Cardinal);
