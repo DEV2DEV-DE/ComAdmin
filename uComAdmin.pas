@@ -176,6 +176,31 @@ type
     property Items[Index: Integer]: TComAdminPartition read GetItem; default;
   end;
 
+  TComAdminInterface = class(TComAdminBaseObject)
+  strict private
+    FCLSID: string;
+    FDescription: string;
+    FIID: string;
+    FQueuingEnabled: Boolean;
+    FQueuingSupported: Boolean;
+    procedure ReadExtendedProperties;
+  public
+    constructor Create(ACollection: TComAdminBaseList; ACatalogObject: ICatalogObject); reintroduce;
+  published
+    property CLSID: string read FCLSID;
+    property Description: string read FDescription write FDescription;
+    property IID: string read FIID;
+    property QueuingEnabled: Boolean read FQueuingEnabled write FQueuingEnabled;
+    property QueuingSupported: Boolean read FQueuingSupported;
+  end;
+
+  TComAdminInterfaceList = class(TComAdminBaseList)
+  strict private
+    function GetItem(Index: Integer): TComAdminInterface;
+  public
+    property Items[Index: Integer]: TComAdminInterface read GetItem; default;
+  end;
+
   TCOMAdminComponent = class(TComAdminBaseObject)
   strict private
     FAllowInprocSubscribers: Boolean;
@@ -199,6 +224,7 @@ type
     FIsInstalled: Boolean;
     FJustInTimeActivation: Boolean;
     FLoadBalancingSupported: Boolean;
+    FInterfaces: TComAdminInterfaceList;
     FIsEventClass: Boolean;
     FIsPrivateComponent: Boolean;
     FMinPoolSize: Cardinal;
@@ -209,6 +235,7 @@ type
     FObjectPoolingEnabled: Boolean;
     FProgID: string;
     FRoles: TComAdminRoleList;
+    procedure GetInterfaces;
     procedure GetRoles;
     procedure ReadExtendedProperties;
     procedure SetComponentTransactionTimeout(const Value: Cardinal);
@@ -536,6 +563,7 @@ const
   COLLECTION_NAME_COMPONENT_ROLES = 'RolesForComponent';
   COLLECTION_NAME_COMPUTER = 'LocalComputer';
   COLLECTION_NAME_INSTANCES = 'ApplicationInstances';
+  COLLECTION_NAME_INTERFACES = 'InterfacesForComponent';
   COLLECTION_NAME_PARTITIONS = 'Partitions';
   COLLECTION_NAME_ROLES = 'Roles';
   COLLECTION_NAME_USERS = 'UsersInRole';
@@ -554,6 +582,7 @@ const
   PROPERTY_NAME_BITNESS = 'Bitness';
   PROPERTY_NAME_CHANGEABLE = 'Changeable';
   PROPERTY_NAME_CIS_ENABLED = 'CISEnabled';
+  PROPERTY_NAME_CLSID = 'CLSID';
   PROPERTY_NAME_COMMAND_LINE = 'CommandLine';
   PROPERTY_NAME_COMPONENT_ACCESS_CHECKS = 'ComponentAccessChecksEnabled';
   PROPERTY_NAME_COMPONENT_TIMEOUT = 'ComponentTransactionTimeout';
@@ -584,6 +613,7 @@ const
   PROPERTY_NAME_EXCEPTION_CLASS = 'ExceptionClass';
   PROPERTY_NAME_FIRE_IN_PARALLEL = 'FireInParallel';
   PROPERTY_NAME_IDENTITY = 'Identity';
+  PROPERTY_NAME_IID = 'IID';
   PROPERTY_NAME_IIS_INTRINSICS = 'IISIntrinsics';
   PROPERTY_NAME_IMPERSONATION = 'ImpersonationLevel';
   PROPERTY_NAME_INIT_SERVER_APPLICATION = 'InitializeServerApplication';
@@ -619,6 +649,7 @@ const
   PROPERTY_NAME_QC_MAXTHREADS = 'QCListenerMaxThreads';
   PROPERTY_NAME_QUEUE_LISTENER = 'QueueListenerEnabled';
   PROPERTY_NAME_QUEUING_ENABLED = 'QueuingEnabled';
+  PROPERTY_NAME_QUEUING_SUPPORTED = 'QueuingSupported';
   PROPERTY_NAME_RECYCLE_ACTIVATION = 'RecycleActivationLimit';
   PROPERTY_NAME_RECYCLE_CALL_LIMIT = 'RecycleCallLimit';
   PROPERTY_NAME_RECYCLE_EXPIRATION = 'RecycleExpirationTimeout';
@@ -901,6 +932,30 @@ begin
   Result := inherited Items[Index] as TComAdminPartition;
 end;
 
+{ TComAdminInterface }
+
+constructor TComAdminInterface.Create(ACollection: TComAdminBaseList; ACatalogObject: ICatalogObject);
+begin
+  inherited Create(ACollection, ACatalogObject);
+  ReadExtendedProperties;
+end;
+
+procedure TComAdminInterface.ReadExtendedProperties;
+begin
+  FCLSID := VarToStr(CatalogObject.Value[PROPERTY_NAME_CLSID]);
+  FDescription := VarToStr(CatalogObject.Value[PROPERTY_NAME_DESCRIPTION]);
+  FIID := VarToStr(CatalogObject.Value[PROPERTY_NAME_IID]);
+  FQueuingEnabled := VarAsType(CatalogObject.Value[PROPERTY_NAME_IID], varBoolean);
+  FQueuingSupported := VarAsType(CatalogObject.Value[PROPERTY_NAME_IID], varBoolean);
+end;
+
+{ TComAdminInterfaceList }
+
+function TComAdminInterfaceList.GetItem(Index: Integer): TComAdminInterface;
+begin
+  Result := inherited Items[Index] as TComAdminInterface;
+end;
+
 { TCOMAdminComponent }
 
 constructor TCOMAdminComponent.Create(ACollection: TComAdminBaseList; ACatalogObject: ICatalogObject);
@@ -908,13 +963,24 @@ begin
   inherited Create(ACollection, ACatalogObject);
   ReadExtendedProperties;
   FRoles := TComAdminRoleList.Create(Self, ACollection.Catalog, ACollection.CatalogCollection.GetCollection(COLLECTION_NAME_COMPONENT_ROLES, Key) as ICatalogCollection);
+  FInterfaces := TComAdminInterfaceList.Create(Self, ACollection.Catalog, ACollection.CatalogCollection.GetCollection(COLLECTION_NAME_INTERFACES, Key) as ICatalogCollection);
   GetRoles;
+  GetInterfaces;
 end;
 
 destructor TCOMAdminComponent.Destroy;
 begin
   FRoles.Free;
+  FInterfaces.Free;
   inherited;
+end;
+
+procedure TCOMAdminComponent.GetInterfaces;
+var
+  i: Integer;
+begin
+  for i := 0 to FInterfaces.CatalogCollection.Count - 1 do
+    FInterfaces.Add(TComAdminRole.Create(FInterfaces, FInterfaces.CatalogCollection.Item[i] as ICatalogObject));
 end;
 
 procedure TCOMAdminComponent.GetRoles;
