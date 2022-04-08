@@ -1,5 +1,8 @@
 unit uComAdmin;
 
+// Compile with RTTI
+{$M+}
+
 // https://docs.microsoft.com/en-us/windows/win32/cossdk/com--administration-collections
 
 interface
@@ -43,6 +46,12 @@ const
   DEFAULT_RECYCLE_TIMEOUT = 15;
   DEFAULT_SHUTDOWN = 3;
   DEFAULT_TRANSACTION_TIMEOUT = 60;
+  MAX_DUMP_COUNT = 200;
+  MAX_LIFETIME_LIMIT = 30240;
+  MAX_POOL_SIZE = DEFAULT_MAX_POOL;
+  MAX_RECYCLE_TIMEOUT = 1440;
+  MAX_THREADS = 1000;
+  MAX_TIMEOUT = 3600;
 
 type
   // forward declaration of internally used classes
@@ -66,6 +75,7 @@ type
     property CatalogCollection: ICatalogCollection read FCatalogCollection;
     property CatalogObject: ICatalogObject read FCatalogObject;
     property Collection: TComAdminBaseList read FCollection;
+  published
     property Key: string read FKey write FKey;
     property Name: string read FName write FName;
   end;
@@ -110,8 +120,9 @@ type
     destructor Destroy; override;
     function CopyProperties(ASourceRole: TComAdminRole): Integer;
     procedure SyncUsers(ASourceRole: TComAdminRole);
-    property Description: string read FDescription write SetDescription;
     property Users: TComAdminUserList read FUsers write FUsers;
+  published
+    property Description: string read FDescription write SetDescription;
   end;
 
   TComAdminRoleList = class(TComAdminBaseList)
@@ -131,6 +142,7 @@ type
     procedure ReadExtendedProperties;
   public
     constructor Create(ACollection: TComAdminBaseList; ACatalogObject: ICatalogObject); reintroduce;
+  published
     property HasRecycled: Boolean read FHasRecycled;
     property IsPaused: Boolean read FIsPaused;
     property ProcessID: Cardinal read FProcessID;
@@ -151,6 +163,7 @@ type
     procedure ReadExtendedProperties;
   public
     constructor Create(ACollection: TComAdminBaseList; ACatalogObject: ICatalogObject); reintroduce;
+  published
     property Changeable: Boolean read FChangeable write FChangeable default True;
     property Deleteable: Boolean read FDeleteable write FDeleteable default True;
     property Description: string read FDescription write FDescription;
@@ -205,6 +218,8 @@ type
   public
     constructor Create(ACollection: TComAdminBaseList; ACatalogObject: ICatalogObject); reintroduce;
     destructor Destroy; override;
+    property Roles: TComAdminRoleList read FRoles write FRoles;
+  published
     property AllowInprocSubscribers: Boolean read FAllowInprocSubscribers write FAllowInprocSubscribers default True;
     property ApplicationID: string read FApplicationID write FApplicationID;
     property Bitness: TCOMAdminComponentType read FBitness write FBitness;
@@ -235,12 +250,12 @@ type
     property MustRunInDefaultContext: Boolean read FMustRunInDefaultContext write FMustRunInDefaultContext default False;
     property ObjectPoolingEnabled: Boolean read FObjectPoolingEnabled write FObjectPoolingEnabled default False;
     property ProgID: string read FProgID write FProgID;
-    property Roles: TComAdminRoleList read FRoles write FRoles;
   end;
 
   TCOMAdminComponentList = class(TComAdminBaseList)
   strict private
     function GetItem(Index: Integer): TCOMAdminComponent;
+    function BuildTargetLibraryName(ASourceComponent: TCOMAdminComponent): string;
   public
     function Append(ASourceComponent: TCOMAdminComponent): TCOMAdminComponent;
     function Find(const AName: string; var AComponent: TCOMAdminComponent): Boolean;
@@ -357,6 +372,8 @@ type
     function GetInstances: TComAdminInstanceList;
     function CopyProperties(ASourceApplication: TCOMAdminApplication): Integer;
     function InstallComponent(const ALibraryName: string): TCOMAdminComponent;
+    property Roles: TComAdminRoleList read FRoles;
+  published
     property AccessChecksEnabled: Boolean read FAccessChecksEnabled write SetAccessChecksEnabled default True;
     property AccessChecksLevel: TCOMAdminAccessChecksLevelOptions read FAccessChecksLevel write SetAccessChecksLevel default COMAdminAccessChecksApplicationComponentLevel;
     property Activation: TCOMAdminApplicationActivation read FActivation write SetActivation default COMAdminActivationLocal;
@@ -398,7 +415,6 @@ type
     property RecycleLifetimeLimit: Cardinal read FRecycleLifetimeLimit write SetRecycleLifetimeLimit default 0;
     property RecycleMemoryLimit: Cardinal read FRecycleMemoryLimit write SetRecycleMemoryLimit default 0;
     property Replicable: Boolean read FReplicable write SetReplicable default True;
-    property Roles: TComAdminRoleList read FRoles;
     property RunForever: Boolean read FRunForever write SetRunForever default False;
     property ServiceName: string read FServiceName write SetServiceName;
     property ShutdownAfter: Cardinal read FShutdownAfter write SetShutdownAfter default DEFAULT_SHUTDOWN;
@@ -447,6 +463,7 @@ type
     procedure SetTransactionTimeout(const Value: Cardinal);
   public
     constructor Create(ACatalogCollection: ICatalogCollection); reintroduce;
+  published
     property ApplicationProxyRSN: string read FApplicationProxyRSN write FApplicationProxyRSN;
     property CISEnabled: Boolean read FCISEnabled write FCISEnabled default False;
     property DCOMEnabled: Boolean read FDCOMEnabled write FDCOMEnabled default True;
@@ -482,6 +499,7 @@ type
     FLibraryPath: string;
     FOnReadObject: TComAdminReadEvent;
     FPartitions: TComAdminPartitionList;
+    FServer: string;
     procedure GetApplications;
     procedure GetPartitions;
     procedure SetFilter(const Value: string);
@@ -500,6 +518,7 @@ type
     property Filter: string read FFilter write SetFilter;
     property LibraryPath: string read FLibraryPath write FLibraryPath;
     property OnReadObject: TComAdminReadEvent read FOnReadObject write FOnReadObject;
+    property Server: string read FServer;
   end;
 
   EItemNotFoundException = Exception;
@@ -521,6 +540,7 @@ const
   COLLECTION_NAME_ROLES = 'Roles';
   COLLECTION_NAME_USERS = 'UsersInRole';
   DEFAULT_APP_FILTER = '*';
+  ERROR_INVALID_LIBRARY_PATH = 'Invalid library path for server %s';
   PROPERTY_NAME_3GIG = '3GigSupportEnabled';
   PROPERTY_NAME_ACCESS_CHECK_LEVEL = 'AccessChecksLevel';
   PROPERTY_NAME_ACCESS_CHECKS = 'ApplicationAccessChecksEnabled';
@@ -573,6 +593,7 @@ const
   PROPERTY_NAME_IS_PRIVATE_COMPONENT = 'IsPrivateComponent';
   PROPERTY_NAME_IS_ROUTER = 'IsRouter';
   PROPERTY_NAME_JUST_IN_TIME = 'JustInTimeActivation';
+  PROPERTY_NAME_KEY = 'Key';
   PROPERTY_NAME_LOAD_BALANCING = 'LoadBalancingSupported';
   PROPERTY_NAME_LOAD_BALANCING_ID = 'LoadBalancingCLSID';
   PROPERTY_NAME_MAX_DUMPS = 'MaxDumpCount';
@@ -636,23 +657,22 @@ var
   AValue, ASource, ATarget: TValue;
 begin
   LRttiContext := TRttiContext.Create;
-  LType := LRttiContext.GetType(ASourceObject.ClassInfo);
-  ASource := TValue.From<TComAdminBaseObject>(ASourceObject);
-  ATarget := TValue.From<TComAdminBaseObject>(ATargetObject);
+  try
+    LType := LRttiContext.GetType(ASourceObject.ClassInfo);
+    ASource := TValue.From<TComAdminBaseObject>(ASourceObject);
+    ATarget := TValue.From<TComAdminBaseObject>(ATargetObject);
 
-  for LProperty in LType.GetProperties do
-  begin
-    if (LProperty.IsReadable) and (LProperty.IsWritable) and (LProperty.Visibility = mvPublic) then
-    try
-      AValue := LProperty.GetValue(ASource.AsObject);
-      LProperty.SetValue(ATarget.AsObject, AValue);
-    except
-      on E:Exception do
+    for LProperty in LType.GetProperties do
+    begin
+      if (LProperty.IsReadable) and (LProperty.IsWritable) and (LProperty.Visibility = mvPublished) then
       begin
-        if Assigned(FCollection.Catalog.OnReadObject) then
-          FCollection.Catalog.OnReadObject(ATargetObject.Name, E.Message);
+        AValue := LProperty.GetValue(ASource.AsObject);
+        LProperty.SetValue(ATarget.AsObject, AValue);
       end;
     end;
+
+  finally
+    LRttiContext.Free;
   end;
 end;
 
@@ -691,8 +711,11 @@ begin
   FOwner := AOwner;
   FCatalog := ACatalog;
   FCatalogCollection := ACatalogCollection;
-  FName := ACatalogCollection.Name;
-  FCatalogCollection.Populate;
+  if Assigned(FCatalogCollection) then
+  begin
+    FName := FCatalogCollection.Name;
+    FCatalogCollection.Populate;
+  end;
 end;
 
 function TComAdminBaseList.SaveChanges: Integer;
@@ -752,14 +775,24 @@ end;
 constructor TComAdminRole.Create(ACollection: TComAdminBaseList; ACatalogObject: ICatalogObject);
 begin
   inherited Create(ACollection, ACatalogObject);
-  FDescription := VarToStrDef(CatalogObject.Value[PROPERTY_NAME_DESCRIPTION], '');
-  FUsers := TComAdminUserList.Create(Self, ACollection.Catalog, ACollection.CatalogCollection.GetCollection(COLLECTION_NAME_USERS, Key) as ICatalogCollection);
-  GetUsers;
+  if ACollection.Owner is TComAdminApplication then
+  begin
+    FDescription := VarToStrDef(CatalogObject.Value[PROPERTY_NAME_DESCRIPTION], '');
+    FUsers := TComAdminUserList.Create(Self, ACollection.Catalog, ACollection.CatalogCollection.GetCollection(COLLECTION_NAME_USERS, Key) as ICatalogCollection);
+    GetUsers;
+  end else
+    FUsers := TComAdminUserList.Create(Self, ACollection.Catalog, nil);
 end;
 
 destructor TComAdminRole.Destroy;
 begin
-  FUsers.Free;
+  if Assigned(FUsers) then
+  try
+    FUsers.Free;
+  except
+    on E:Exception do
+      OutputDebugString(PChar('#Error in destructor for ' + Self.ClassName + ' (' + Collection.Owner.Name + '.' + Collection.Name + '.' + Self.Name + '): ' + E.Message));
+  end;
   inherited;
 end;
 
@@ -928,50 +961,56 @@ end;
 
 procedure TCOMAdminComponent.SetComponentTransactionTimeout(const Value: Cardinal);
 begin
-  case Value of
-    0..3600: FComponentTransactionTimeout := Value;
+  if InternalCheckRange(0, MAX_TIMEOUT, Value) then
+    FComponentTransactionTimeout := Value
   else
     raise EArgumentOutOfRangeException.Create(ERROR_OUT_OF_RANGE);
-  end;
 end;
 
 procedure TCOMAdminComponent.SetCreationTimeout(const Value: Cardinal);
 begin
-  case Value of
-    0..MAXLONG: FCreationTimeout := Value;
+  if InternalCheckRange(0, MAXLONG, Value) then
+    FCreationTimeout := Value
   else
     raise EArgumentOutOfRangeException.Create(ERROR_OUT_OF_RANGE);
-  end;
 end;
 
 procedure TCOMAdminComponent.SetMaxPoolSize(const Value: Cardinal);
 begin
-  case Value of
-    1..DEFAULT_MAX_POOL: FMaxPoolSize := Value;
+  if InternalCheckRange(1, MAX_POOL_SIZE, Value) then
+    FMaxPoolSize := Value
   else
     raise EArgumentOutOfRangeException.Create(ERROR_OUT_OF_RANGE);
-  end;
 end;
 
 procedure TCOMAdminComponent.SetMinPoolSize(const Value: Cardinal);
 begin
-  case Value of
-    0..DEFAULT_MAX_POOL: FMinPoolSize := Value;
+  if InternalCheckRange(0, MAX_POOL_SIZE, Value) then
+    FMinPoolSize := Value
   else
     raise EArgumentOutOfRangeException.Create(ERROR_OUT_OF_RANGE);
-  end;
 end;
 
 { TCOMAdminComponentList }
 
 function TCOMAdminComponentList.Append(ASourceComponent: TCOMAdminComponent): TCOMAdminComponent;
 var
-  LLibraryName: string;
+  LLibraryName, LTargetLibrary: string;
 begin
+  LTargetLibrary := BuildTargetLibraryName(ASourceComponent);
+  if not FileExists(LTargetLibrary) then
+    TFile.Copy(ASourceComponent.Dll, LTargetLibrary);
   LLibraryName := TPath.Combine(Catalog.LibraryPath, ExtractFileName(ASourceComponent.Dll));
   Result := (Owner as TComAdminApplication).InstallComponent(LLibraryName);
   Result.CopyProperties(ASourceComponent);
   Catalog.ChangeCount := Catalog.ChangeCount + CatalogCollection.SaveChanges;
+end;
+
+function TCOMAdminComponentList.BuildTargetLibraryName(ASourceComponent: TCOMAdminComponent): string;
+begin
+  if Catalog.LibraryPath.IsEmpty then
+    raise Exception.CreateFmt(ERROR_INVALID_LIBRARY_PATH, [Catalog.Server]);
+  Result := Format('\\%s\%s', [Catalog.Server, TPath.Combine(Catalog.LibraryPath, ExtractFileName(ASourceComponent.Dll)).Replace(':','$')]);
 end;
 
 function TCOMAdminComponentList.Find(const AName: string; var AComponent: TCOMAdminComponent): Boolean;
@@ -1049,9 +1088,10 @@ end;
 
 function TComAdminApplication.InstallComponent(const ALibraryName: string): TCOMAdminComponent;
 begin
-  Collection.Catalog.Catalog.InstallComponent(Key, ALibraryName, '', '');
-  Collection.SaveChanges;
-  Result := Collection.Items[Collection.Count - 1] as TCOMAdminComponent;
+  Collection.Catalog.Catalog.InstallComponent(Name, ALibraryName, '', '');
+  FComponents.CatalogCollection.Populate; // muste be populated to retrieve the newly installed component
+  FComponents.Add(TCOMAdminComponent.Create(FComponents, (FComponents.CatalogCollection.Item[FComponents.CatalogCollection.Count - 1]) as ICatalogObject));
+  Result := FComponents.Items[FComponents.Count - 1] as TCOMAdminComponent;
 end;
 
 function TComAdminApplication.GetInstances: TComAdminInstanceList;
@@ -1173,7 +1213,7 @@ end;
 
 procedure TComAdminApplication.SetConcurrentApps(const Value: Cardinal);
 begin
-  if InternalCheckRange(1, 1048576, Value) then
+  if InternalCheckRange(1, MAX_POOL_SIZE, Value) then
   begin
     FConcurrentApps := Value;
     if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_CONCURRENT_APPS) then
@@ -1288,7 +1328,7 @@ end;
 
 procedure TComAdminApplication.SetMaxDumpCount(const Value: Cardinal);
 begin
-  if InternalCheckRange(1, 200, Value) then
+  if InternalCheckRange(1, MAX_DUMP_COUNT, Value) then
   begin
     FMaxDumpCount := Value;
     if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_MAX_DUMPS) then
@@ -1330,7 +1370,7 @@ end;
 
 procedure TComAdminApplication.SetQCListenerMaxThreads(const Value: Cardinal);
 begin
-  if InternalCheckRange(0, 1000, Value) then
+  if InternalCheckRange(0, MAX_THREADS, Value) then
   begin
     FQCListenerMaxThreads := Value;
     if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_QC_MAXTHREADS) then
@@ -1354,7 +1394,7 @@ end;
 
 procedure TComAdminApplication.SetRecycleActivationLimit(const Value: Cardinal);
 begin
-  if InternalCheckRange(0, 1048576, Value) then
+  if InternalCheckRange(0, MAX_POOL_SIZE, Value) then
   begin
     FRecycleActivationLimit := Value;
     if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_RECYCLE_ACTIVATION) then
@@ -1364,7 +1404,7 @@ end;
 
 procedure TComAdminApplication.SetRecycleCallLimit(const Value: Cardinal);
 begin
-  if InternalCheckRange(0, 1048576, Value) then
+  if InternalCheckRange(0, MAX_POOL_SIZE, Value) then
   begin
     FRecycleCallLimit := Value;
     if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_RECYCLE_CALL_LIMIT) then
@@ -1374,7 +1414,7 @@ end;
 
 procedure TComAdminApplication.SetRecycleExpirationTimeout(const Value: Cardinal);
 begin
-  if InternalCheckRange(1, 1440, Value) then
+  if InternalCheckRange(1, MAX_RECYCLE_TIMEOUT, Value) then
   begin
     FRecycleExpirationTimeout := Value;
     if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_RECYCLE_EXPIRATION) then
@@ -1384,7 +1424,7 @@ end;
 
 procedure TComAdminApplication.SetRecycleLifetimeLimit(const Value: Cardinal);
 begin
-  if InternalCheckRange(0, 30240, Value) then
+  if InternalCheckRange(0, MAX_LIFETIME_LIMIT, Value) then
   begin
     FRecycleLifetimeLimit := Value;
     if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_RECYCLE_LIFETIME_LIMIT) then
@@ -1394,7 +1434,7 @@ end;
 
 procedure TComAdminApplication.SetRecycleMemoryLimit(const Value: Cardinal);
 begin
-  if InternalCheckRange(0, 1048576, Value) then
+  if InternalCheckRange(0, MAX_POOL_SIZE, Value) then
   begin
     FRecycleMemoryLimit := Value;
     if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_RECYCLE_MEMORY_LIMIT) then
@@ -1423,7 +1463,7 @@ end;
 
 procedure TComAdminApplication.SetShutdownAfter(const Value: Cardinal);
 begin
-  if InternalCheckRange(0, 1440, Value) then
+  if InternalCheckRange(0, MAX_RECYCLE_TIMEOUT, Value) then
   begin
     FShutdownAfter := Value;
     if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_SHUTDOWN) then
@@ -1516,6 +1556,7 @@ begin
   if not ACreatorString.IsEmpty then
     Result.CreatedBy := ACreatorString;
   Catalog.ChangeCount := Catalog.ChangeCount + CatalogCollection.SaveChanges;
+  Result.Key := LApplication.Key;
   Self.Add(Result);
 end;
 
@@ -1577,11 +1618,10 @@ end;
 
 procedure TComAdminComputer.SetTransactionTimeout(const Value: Cardinal);
 begin
-  case Value of
-    1..3600: FTransactionTimeout := Value;
+  if InternalCheckRange(1, MAX_TIMEOUT, Value) then
+    FTransactionTimeout := Value
   else
     raise EArgumentOutOfRangeException.Create(ERROR_OUT_OF_RANGE);
-  end;
 end;
 
 { TComAdminCatalog }
@@ -1591,6 +1631,7 @@ begin
   inherited Create;
 
   FCatalog := CoCOMAdminCatalog.Create;
+  FServer := AServer;
 
   FOnReadObject := AOnReadEvent;
 
@@ -1684,6 +1725,7 @@ var
 begin
   LTargetServerCatalog := TComAdminCatalog.Create(ATargetServer, FFilter, FOnReadObject);
   try
+    LTargetServerCatalog.LibraryPath := FLibraryPath;
     LTargetServerCatalog.ChangeCount := 0;
     for i := 0 to FApplications.Count - 1 do
     begin
