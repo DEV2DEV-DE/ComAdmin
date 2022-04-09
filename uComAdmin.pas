@@ -52,14 +52,21 @@ const
   MAX_RECYCLE_TIMEOUT = 1440;
   MAX_THREADS = 1000;
   MAX_TIMEOUT = 3600;
+  IID_IUserCollection: TGUID = '{C29ADAEE-CB81-4D36-BEDF-9F131094D9A5}';
 
 type
+  // Interface to check for objects that have a roles collection
+  IUserCollection = Interface(IInterface)
+    ['{C29ADAEE-CB81-4D36-BEDF-9F131094D9A5}']
+    function GetUsersCollectionName: string;
+  end;
+
   // forward declaration of internally used classes
   TComAdminBaseList = class;
   TComAdminCatalog = class;
 
   // generic base class for all single objects
-  TComAdminBaseObject = class(TObject)
+  TComAdminBaseObject = class(TInterfacedObject)
   strict private
     FCatalogCollection: ICatalogCollection;
     FCatalogObject: ICatalogObject;
@@ -155,14 +162,19 @@ type
     property Items[Index: Integer]: TComAdminInstance read GetItem; default;
   end;
 
-  TComAdminPartition = class(TComAdminBaseObject)
+  TComAdminPartition = class(TComAdminBaseObject, IUserCollection)
   strict private
     FDescription: string;
     FChangeable: Boolean;
     FDeleteable: Boolean;
+    FRoles: TComAdminRoleList;
+    procedure GetRoles;
     procedure ReadExtendedProperties;
   public
     constructor Create(ACollection: TComAdminBaseList; ACatalogObject: ICatalogObject); reintroduce;
+    destructor Destroy; override;
+    function GetUsersCollectionName: string;
+    property Roles: TComAdminRoleList read FRoles write FRoles;
   published
     property Changeable: Boolean read FChangeable write FChangeable default True;
     property Deleteable: Boolean read FDeleteable write FDeleteable default True;
@@ -176,16 +188,53 @@ type
     property Items[Index: Integer]: TComAdminPartition read GetItem; default;
   end;
 
+  TComAdminMethod = class(TComAdminBaseObject)
+  strict private
+    FAutoComplete: Boolean;
+    FCLSID: string;
+    FDescription: string;
+    FIID: string;
+    FIndex: Cardinal;
+    FRoles: TComAdminRoleList;
+    procedure ReadExtendedProperties;
+  private
+    procedure GetRoles;
+  public
+    constructor Create(ACollection: TComAdminBaseList; ACatalogObject: ICatalogObject); reintroduce;
+    destructor Destroy; override;
+    property Roles: TComAdminRoleList read FRoles write FRoles;
+  published
+    property AutoComplete: Boolean read FAutoComplete write FAutoComplete default false;
+    property Description: string read FDescription write FDescription;
+    property CLSID: string read FCLSID;
+    property IID: string read FIID;
+    property Index: Cardinal read FIndex write FIndex;
+  end;
+
+  TComAdminMethodList = class(TComAdminBaseList)
+  strict private
+    function GetItem(Index: Integer): TComAdminMethod;
+  public
+    property Items[Index: Integer]: TComAdminMethod read GetItem; default;
+  end;
+
   TComAdminInterface = class(TComAdminBaseObject)
   strict private
     FCLSID: string;
     FDescription: string;
     FIID: string;
+    FRoles: TComAdminRoleList;
+    FMethods: TComAdminMethodList;
     FQueuingEnabled: Boolean;
     FQueuingSupported: Boolean;
     procedure ReadExtendedProperties;
+  private
+    procedure GetRoles;
+    procedure GetMethods;
   public
     constructor Create(ACollection: TComAdminBaseList; ACatalogObject: ICatalogObject); reintroduce;
+    destructor Destroy; override;
+    property Roles: TComAdminRoleList read FRoles write FRoles;
   published
     property CLSID: string read FCLSID;
     property Description: string read FDescription write FDescription;
@@ -289,7 +338,7 @@ type
     property Items[Index: Integer]: TCOMAdminComponent read GetItem; default;
   end;
 
-  TComAdminApplication = class(TComAdminBaseObject)
+  TComAdminApplication = class(TComAdminBaseObject, IUserCollection)
   strict private
     FRoles: TComAdminRoleList;
     FInstances: TComAdminInstanceList;
@@ -398,6 +447,7 @@ type
     destructor Destroy; override;
     function GetInstances: TComAdminInstanceList;
     function CopyProperties(ASourceApplication: TCOMAdminApplication): Integer;
+    function GetUsersCollectionName: string;
     function InstallComponent(const ALibraryName: string): TCOMAdminComponent;
     property Roles: TComAdminRoleList read FRoles;
   published
@@ -564,9 +614,14 @@ const
   COLLECTION_NAME_COMPUTER = 'LocalComputer';
   COLLECTION_NAME_INSTANCES = 'ApplicationInstances';
   COLLECTION_NAME_INTERFACES = 'InterfacesForComponent';
+  COLLECTION_NAME_INTERFACE_ROLES = 'RolesForInterface';
+  COLLECTION_NAME_METHODS = 'MethodsForInterface';
+  COLLECTION_NAME_METHOD_ROLES = 'RolesForMethod';
   COLLECTION_NAME_PARTITIONS = 'Partitions';
+  COLLECTION_NAME_PARTITION_ROLES = 'RolesForPartition';
   COLLECTION_NAME_ROLES = 'Roles';
   COLLECTION_NAME_USERS = 'UsersInRole';
+  COLLECTION_NAME_USERS_PARTITION = 'UsersInPartitionRole';
   DEFAULT_APP_FILTER = '*';
   ERROR_INVALID_LIBRARY_PATH = 'Invalid library path for server %s';
   PROPERTY_NAME_3GIG = '3GigSupportEnabled';
@@ -579,6 +634,7 @@ const
   PROPERTY_NAME_APPLICATION_PROXY = 'ApplicationProxy';
   PROPERTY_NAME_AUTH_CAPABILITY = 'AuthenticationCapability';
   PROPERTY_NAME_AUTHENTICATION = 'Authentication';
+  PROPERTY_NAME_AUTO_COMPLETE = 'AutoComplete';
   PROPERTY_NAME_BITNESS = 'Bitness';
   PROPERTY_NAME_CHANGEABLE = 'Changeable';
   PROPERTY_NAME_CIS_ENABLED = 'CISEnabled';
@@ -616,6 +672,7 @@ const
   PROPERTY_NAME_IID = 'IID';
   PROPERTY_NAME_IIS_INTRINSICS = 'IISIntrinsics';
   PROPERTY_NAME_IMPERSONATION = 'ImpersonationLevel';
+  PROPERTY_NAME_INDEX = 'Index';
   PROPERTY_NAME_INIT_SERVER_APPLICATION = 'InitializeServerApplication';
   PROPERTY_NAME_INTERNET_PORTS = 'InternetPortsListed';
   PROPERTY_NAME_IS_EVENT_CLASS = 'IsEventClass';
@@ -804,15 +861,19 @@ begin
 end;
 
 constructor TComAdminRole.Create(ACollection: TComAdminBaseList; ACatalogObject: ICatalogObject);
+var
+  LObject: IUserCollection;
 begin
   inherited Create(ACollection, ACatalogObject);
-  if ACollection.Owner is TComAdminApplication then
+
+
+  if (ACollection.Owner.QueryInterface(IID_IUserCollection, LObject) = S_OK) then
   begin
     FDescription := VarToStrDef(CatalogObject.Value[PROPERTY_NAME_DESCRIPTION], '');
-    FUsers := TComAdminUserList.Create(Self, ACollection.Catalog, ACollection.CatalogCollection.GetCollection(COLLECTION_NAME_USERS, Key) as ICatalogCollection);
+    FUsers := TComAdminUserList.Create(Self, ACollection.Catalog, ACollection.CatalogCollection.GetCollection(LObject.GetUsersCollectionName, Key) as ICatalogCollection);
     GetUsers;
-  end else
-    FUsers := TComAdminUserList.Create(Self, ACollection.Catalog, nil);
+  end;
+
 end;
 
 destructor TComAdminRole.Destroy;
@@ -915,7 +976,28 @@ end;
 constructor TComAdminPartition.Create(ACollection: TComAdminBaseList; ACatalogObject: ICatalogObject);
 begin
   inherited Create(ACollection, ACatalogObject);
+  FRoles := TComAdminRoleList.Create(Self, ACollection.Catalog, ACollection.CatalogCollection.GetCollection(COLLECTION_NAME_PARTITION_ROLES, Key) as ICatalogCollection);
   ReadExtendedProperties;
+  GetRoles;
+end;
+
+destructor TComAdminPartition.Destroy;
+begin
+  FRoles.Free;
+  inherited;
+end;
+
+function TComAdminPartition.GetUsersCollectionName: string;
+begin
+  Result := COLLECTION_NAME_USERS_PARTITION;
+end;
+
+procedure TComAdminPartition.GetRoles;
+var
+  i: Integer;
+begin
+  for i := 0 to FRoles.CatalogCollection.Count - 1 do
+    FRoles.Add(TComAdminRole.Create(FRoles, FRoles.CatalogCollection.Item[i] as ICatalogObject));
 end;
 
 procedure TComAdminPartition.ReadExtendedProperties;
@@ -932,12 +1014,78 @@ begin
   Result := inherited Items[Index] as TComAdminPartition;
 end;
 
+{ TComAdminMethod }
+
+constructor TComAdminMethod.Create(ACollection: TComAdminBaseList; ACatalogObject: ICatalogObject);
+begin
+  inherited Create(ACollection, ACatalogObject);
+  FRoles := TComAdminRoleList.Create(Self, ACollection.Catalog, ACollection.CatalogCollection.GetCollection(COLLECTION_NAME_METHOD_ROLES, Key) as ICatalogCollection);
+  ReadExtendedProperties;
+  GetRoles;
+end;
+
+destructor TComAdminMethod.Destroy;
+begin
+  FRoles.Free;
+  inherited;
+end;
+
+procedure TComAdminMethod.GetRoles;
+var
+  i: Integer;
+begin
+  for i := 0 to FRoles.CatalogCollection.Count - 1 do
+    FRoles.Add(TComAdminRole.Create(FRoles, FRoles.CatalogCollection.Item[i] as ICatalogObject));
+end;
+
+procedure TComAdminMethod.ReadExtendedProperties;
+begin
+  FAutoComplete := VarAsType(CatalogObject.Value[PROPERTY_NAME_AUTO_COMPLETE], varBoolean);
+  FCLSID := VarToStr(CatalogObject.Value[PROPERTY_NAME_CLSID]);
+  FDescription := VarToStr(CatalogObject.Value[PROPERTY_NAME_DESCRIPTION]);
+  FIID := VarToStr(CatalogObject.Value[PROPERTY_NAME_IID]);
+  FIndex := VarAsType(CatalogObject.Value[PROPERTY_NAME_INDEX], varLongWord);
+end;
+
+{ TComAdminMethodList }
+
+function TComAdminMethodList.GetItem(Index: Integer): TComAdminMethod;
+begin
+  Result := inherited Items[Index] as TComAdminMethod;
+end;
+
 { TComAdminInterface }
 
 constructor TComAdminInterface.Create(ACollection: TComAdminBaseList; ACatalogObject: ICatalogObject);
 begin
   inherited Create(ACollection, ACatalogObject);
   ReadExtendedProperties;
+  FRoles := TComAdminRoleList.Create(Self, ACollection.Catalog, ACollection.CatalogCollection.GetCollection(COLLECTION_NAME_INTERFACE_ROLES, Key) as ICatalogCollection);
+  FMethods := TComAdminMethodList.Create(Self, ACollection.Catalog, ACollection.CatalogCollection.GetCollection(COLLECTION_NAME_METHODS, Key) as ICatalogCollection);
+  GetRoles;
+  GetMethods;
+end;
+
+destructor TComAdminInterface.Destroy;
+begin
+  FRoles.Free;
+  inherited;
+end;
+
+procedure TComAdminInterface.GetMethods;
+var
+  i: Integer;
+begin
+  for i := 0 to FMethods.CatalogCollection.Count - 1 do
+    FMethods.Add(TComAdminRole.Create(FMethods, FMethods.CatalogCollection.Item[i] as ICatalogObject));
+end;
+
+procedure TComAdminInterface.GetRoles;
+var
+  i: Integer;
+begin
+  for i := 0 to FRoles.CatalogCollection.Count - 1 do
+    FRoles.Add(TComAdminRole.Create(FRoles, FRoles.CatalogCollection.Item[i] as ICatalogObject));
 end;
 
 procedure TComAdminInterface.ReadExtendedProperties;
@@ -1142,6 +1290,11 @@ var
 begin
   for i := 0 to FComponents.CatalogCollection.Count - 1 do
     FComponents.Add(TCOMAdminComponent.Create(FComponents, FComponents.CatalogCollection.Item[i] as ICatalogObject));
+end;
+
+function TComAdminApplication.GetUsersCollectionName: string;
+begin
+  Result := COLLECTION_NAME_USERS;
 end;
 
 procedure TComAdminApplication.GetRoles;
