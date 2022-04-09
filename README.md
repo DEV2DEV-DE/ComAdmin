@@ -18,7 +18,7 @@ https://docs.microsoft.com/en-us/windows/win32/cossdk/com--administration-collec
             ● User
       ∞ Components (-)
         ● Component (wip)
-          ∞ Interfaces (-)
+          ∞ Interfaces
             ● Interface
               ∞ Roles (+/-)
                 ● Role
