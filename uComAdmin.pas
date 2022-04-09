@@ -204,11 +204,11 @@ type
     destructor Destroy; override;
     property Roles: TComAdminRoleList read FRoles write FRoles;
   published
-    property AutoComplete: Boolean read FAutoComplete write FAutoComplete default false;
+    property AutoComplete: Boolean read FAutoComplete write FAutoComplete default False;
     property Description: string read FDescription write FDescription;
     property CLSID: string read FCLSID;
     property IID: string read FIID;
-    property Index: Cardinal read FIndex write FIndex;
+    property Index: Cardinal read FIndex;
   end;
 
   TComAdminMethodList = class(TComAdminBaseList)
@@ -1069,6 +1069,7 @@ end;
 destructor TComAdminInterface.Destroy;
 begin
   FRoles.Free;
+  FMethods.Free;
   inherited;
 end;
 
@@ -1093,8 +1094,8 @@ begin
   FCLSID := VarToStr(CatalogObject.Value[PROPERTY_NAME_CLSID]);
   FDescription := VarToStr(CatalogObject.Value[PROPERTY_NAME_DESCRIPTION]);
   FIID := VarToStr(CatalogObject.Value[PROPERTY_NAME_IID]);
-  FQueuingEnabled := VarAsType(CatalogObject.Value[PROPERTY_NAME_IID], varBoolean);
-  FQueuingSupported := VarAsType(CatalogObject.Value[PROPERTY_NAME_IID], varBoolean);
+  FQueuingEnabled := VarAsType(CatalogObject.Value[PROPERTY_NAME_QUEUING_ENABLED], varBoolean);
+  FQueuingSupported := VarAsType(CatalogObject.Value[PROPERTY_NAME_QUEUING_SUPPORTED], varBoolean);
 end;
 
 { TComAdminInterfaceList }
@@ -1128,7 +1129,7 @@ var
   i: Integer;
 begin
   for i := 0 to FInterfaces.CatalogCollection.Count - 1 do
-    FInterfaces.Add(TComAdminRole.Create(FInterfaces, FInterfaces.CatalogCollection.Item[i] as ICatalogObject));
+    FInterfaces.Add(TComAdminInterface.Create(FInterfaces, FInterfaces.CatalogCollection.Item[i] as ICatalogObject));
 end;
 
 procedure TCOMAdminComponent.GetRoles;
