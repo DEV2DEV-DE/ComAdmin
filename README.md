@@ -38,4 +38,4 @@ https://docs.microsoft.com/en-us/windows/win32/cossdk/com--administration-collec
 
 \- This collection supports a Remove method
 
-The Components collection of an Application does not support an Add method. Instead a new Component it is added by installing or importing it with the apprpriate methods of the Catalog object.
+The Components collection of an Application does not support an Add method. Instead, a new Component it is added by installing or importing it with the appropriate methods of the Catalog object.
