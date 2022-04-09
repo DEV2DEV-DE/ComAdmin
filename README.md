@@ -8,17 +8,34 @@ https://docs.microsoft.com/en-us/windows/win32/cossdk/com--administration-collec
 ## Class-Hierarchy:
 ```
 ● Catalog
-  ∞ Applications
+  ∞ Applications (+/-)
     ● Application
-      ∞ Components
-        ● Component (wip)
-      ∞ Instances
+      ∞ Instances (+/-)
         ● Instance
+      ∞ Roles (+/-)
+        ● Role
+          ∞ Users (+/-) 
+            ● User
+      ∞ Components (-)
+        ● Component (wip)
+          ∞ Interfaces (-)
+            ● Interface
+              ∞ Roles (+/-)
+                ● Role
+              ∞ Methods
+                ● Method
+                  ∞ Roles (+/-)
+                    ● Role
+  ● Computer
+  ∞ Partitions (+/-)
+    ● Partition (wip)
       ∞ Roles
         ● Role
-          ∞ Users 
+          ∞ Users (+/-) 
             ● User
-  ● Computer
-  ∞ Partitions
-     ● Partition
 ```
+\+ This collection supports an Add method
+
+\- This collection supports a Remove method
+
+The Components collection of an Application does not support an Add method. Instead a new Component it is added by installing or importing it with the apprpriate methods of the Catalog object.
