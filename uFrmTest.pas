@@ -47,8 +47,9 @@ begin
       for j := 0 to LCatalog.Applications[i].Roles.Count - 1 do
       begin
         RoleNode := tvTree.Items.AddChild(AppNode, LCatalog.Applications[i].Roles[j].Name);
-        for k := 0 to LCatalog.Applications[i].Roles[j].Users.Count - 1 do
-          tvTree.Items.AddChild(RoleNode, LCatalog.Applications[i].Roles[j].Users[k].Name);
+        if Assigned(LCatalog.Applications[i].Roles[j].Users) then
+          for k := 0 to LCatalog.Applications[i].Roles[j].Users.Count - 1 do
+            tvTree.Items.AddChild(RoleNode, LCatalog.Applications[i].Roles[j].Users[k].Name);
       end;
     end;
     tvTree.AlphaSort;
