@@ -94,8 +94,10 @@ type
     FCatalogCollection: ICatalogCollection;
     FName: string;
     FOwner: TComAdminBaseObject;
+    function GetIndexByKey(const AKey: string): Integer;
   public
     constructor Create(AOwner: TComAdminBaseObject; ACatalog: TComAdminCatalog; ACatalogCollection: ICatalogCollection); reintroduce;
+    function Delete(Index: Integer): Integer;
     function SaveChanges: Integer;
     property Catalog: TComAdminCatalog read FCatalog write FCatalog;
     property CatalogCollection: ICatalogCollection read FCatalogCollection write FCatalogCollection;
@@ -507,11 +509,9 @@ type
 
   TComAdminApplicationList = class(TComAdminBaseList)
   strict private
-    function GetApplicationIndex(const AKey: string): Integer;
     function GetItem(Index: Integer): TComAdminApplication;
   public
     function Append(ASourceApplication: TComAdminApplication; const ACreatorString: string = ''): TComAdminApplication;
-    function Delete(Index: Integer): Integer; reintroduce;
     function Find(const AName: string; var AApplication: TComAdminApplication): Boolean;
     property Items[Index: Integer]: TComAdminApplication read GetItem; default;
   end;
@@ -807,6 +807,25 @@ begin
   begin
     FName := FCatalogCollection.Name;
     FCatalogCollection.Populate;
+  end;
+end;
+
+function TComAdminBaseList.Delete(Index: Integer): Integer;
+begin
+  CatalogCollection.Remove(GetIndexByKey(Items[Index].Key));
+  Result := CatalogCollection.SaveChanges;
+  inherited Delete(Index);
+end;
+
+function TComAdminBaseList.GetIndexByKey(const AKey: string): Integer;
+var
+  i: Integer;
+begin
+  Result := -1;
+  for i := 0 to CatalogCollection.Count - 1 do
+  begin
+    if AKey.Equals((CatalogCollection.Item[i] as ICatalogObject).Key) then
+      Exit(i);
   end;
 end;
 
@@ -1785,16 +1804,6 @@ begin
   Self.Add(Result);
 end;
 
-function TComAdminApplicationList.Delete(Index: Integer): Integer;
-var
-  ApplicationIndex: Integer;
-begin
-  ApplicationIndex := GetApplicationIndex(Items[Index].Key);
-  CatalogCollection.Remove(ApplicationIndex);
-  Result := CatalogCollection.SaveChanges;
-  inherited Delete(Index);
-end;
-
 function TComAdminApplicationList.Find(const AName: string; var AApplication: TComAdminApplication): Boolean;
 var
   i: Integer;
@@ -1808,18 +1817,6 @@ begin
     end;
   end;
   Result := False;
-end;
-
-function TComAdminApplicationList.GetApplicationIndex(const AKey: string): Integer;
-var
-  i: Integer;
-begin
-  Result := -1;
-  for i := 0 to CatalogCollection.Count - 1 do
-  begin
-    if AKey.Equals((CatalogCollection.Item[i] as ICatalogObject).Key) then
-      Exit(i);
-  end;
 end;
 
 function TComAdminApplicationList.GetItem(Index: Integer): TComAdminApplication;
