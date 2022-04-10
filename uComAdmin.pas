@@ -1770,6 +1770,12 @@ begin
     end else
       LComponent := FComponents.Append(ASourceApplication.Components[i]); // Component does not exists in target application ==> create & copy
   end;
+  // delete all applications on target server that not exists on main server
+  for i := ASourceApplication.Components.Count - 1 downto 0 do
+  begin
+    if not ASourceApplication.Components.Find(ASourceApplication.Components[i].Name, LComponent) then
+      Collection.Catalog.ChangeCount := Collection.Catalog.ChangeCount + ASourceApplication.Components.Delete(i);
+  end;
 end;
 
 procedure TComAdminApplication.SyncRoles(ASourceApplication: TCOMAdminApplication);
