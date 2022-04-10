@@ -1,4 +1,7 @@
 # ComAdmin
+![](https://tokei.rs/b1/github/DEV2DEV-DE/ComAdmin?category=code)
+![](https://tokei.rs/b1/github/DEV2DEV-DE/ComAdmin?category=files)
+
 Delphi wrapper around the COM+ administration for Windows
 
 Links to MS documentation:
