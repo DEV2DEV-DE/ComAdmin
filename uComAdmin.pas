@@ -167,6 +167,7 @@ type
     FDescription: string;
     FChangeable: Boolean;
     FDeleteable: Boolean;
+    FID: string;
     FRoles: TComAdminRoleList;
     procedure GetRoles;
     procedure ReadExtendedProperties;
@@ -179,6 +180,7 @@ type
     property Changeable: Boolean read FChangeable write FChangeable default True;
     property Deleteable: Boolean read FDeleteable write FDeleteable default True;
     property Description: string read FDescription write FDescription;
+    property ID: string read FID write FID;
   end;
 
   TComAdminPartitionList = class(TComAdminBaseList)
@@ -505,10 +507,12 @@ type
 
   TComAdminApplicationList = class(TComAdminBaseList)
   strict private
+    function GetApplicationIndex(const AKey: string): Integer;
     function GetItem(Index: Integer): TComAdminApplication;
   public
-    function Find(const AName: string; var AApplication: TComAdminApplication): Boolean;
     function Append(ASourceApplication: TComAdminApplication; const ACreatorString: string = ''): TComAdminApplication;
+    function Delete(Index: Integer): Integer; reintroduce;
+    function Find(const AName: string; var AApplication: TComAdminApplication): Boolean;
     property Items[Index: Integer]: TComAdminApplication read GetItem; default;
   end;
 
@@ -1005,6 +1009,7 @@ begin
   FChangeable := VarAsType(CatalogObject.Value[PROPERTY_NAME_CHANGEABLE], varBoolean);
   FDeleteable := VarAsType(CatalogObject.Value[PROPERTY_NAME_DELETEABLE], varBoolean);
   FDescription := VarToStr(CatalogObject.Value[PROPERTY_NAME_DESCRIPTION]);
+  FID := Key;
 end;
 
 { TComAdminPartitionList }
@@ -1780,6 +1785,16 @@ begin
   Self.Add(Result);
 end;
 
+function TComAdminApplicationList.Delete(Index: Integer): Integer;
+var
+  ApplicationIndex: Integer;
+begin
+  ApplicationIndex := GetApplicationIndex(Items[Index].Key);
+  CatalogCollection.Remove(ApplicationIndex);
+  Result := CatalogCollection.SaveChanges;
+  inherited Delete(Index);
+end;
+
 function TComAdminApplicationList.Find(const AName: string; var AApplication: TComAdminApplication): Boolean;
 var
   i: Integer;
@@ -1793,6 +1808,18 @@ begin
     end;
   end;
   Result := False;
+end;
+
+function TComAdminApplicationList.GetApplicationIndex(const AKey: string): Integer;
+var
+  i: Integer;
+begin
+  Result := -1;
+  for i := 0 to CatalogCollection.Count - 1 do
+  begin
+    if AKey.Equals((CatalogCollection.Item[i] as ICatalogObject).Key) then
+      Exit(i);
+  end;
 end;
 
 function TComAdminApplicationList.GetItem(Index: Integer): TComAdminApplication;
@@ -1947,6 +1974,7 @@ begin
   try
     LTargetServerCatalog.LibraryPath := FLibraryPath;
     LTargetServerCatalog.ChangeCount := 0;
+    // sync applications from main server to target server
     for i := 0 to FApplications.Count - 1 do
     begin
       if LTargetServerCatalog.Applications.Find(FApplications[i].Name, LApplication) then
@@ -1957,6 +1985,13 @@ begin
       end else
         LTargetServerCatalog.Applications.Append(FApplications[i], ACreatorString); // Application does not exists on target server ==> create & copy
     end;
+    // delete all applications on target server that not exists on main server
+    for i := LTargetServerCatalog.Applications.Count - 1 downto 0 do
+    begin
+      if not FApplications.Find(LTargetServerCatalog.Applications[i].Name, LApplication) then
+        LTargetServerCatalog.ChangeCount := LTargetServerCatalog.ChangeCount + LTargetServerCatalog.Applications.Delete(i);
+    end;
+    LTargetServerCatalog.Applications.CatalogCollection.SaveChanges;
     Result := LTargetServerCatalog.ChangeCount;
   finally
     LTargetServerCatalog.Free;
