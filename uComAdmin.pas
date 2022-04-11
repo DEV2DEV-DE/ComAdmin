@@ -46,12 +46,14 @@ const
   DEFAULT_RECYCLE_TIMEOUT = 15;
   DEFAULT_SHUTDOWN = 3;
   DEFAULT_TRANSACTION_TIMEOUT = 60;
+
   MAX_DUMP_COUNT = 200;
   MAX_LIFETIME_LIMIT = 30240;
   MAX_POOL_SIZE = DEFAULT_MAX_POOL;
   MAX_RECYCLE_TIMEOUT = 1440;
   MAX_THREADS = 1000;
   MAX_TIMEOUT = 3600;
+
   IID_IUserCollection: TGUID = '{C29ADAEE-CB81-4D36-BEDF-9F131094D9A5}';
 
 type
@@ -113,7 +115,7 @@ type
     function GetItem(Index: Integer): TComAdminUser;
   public
     function Append(ASourceUser: TComAdminUser): TComAdminUser;
-    function Find(const AName: string; var AUser: TComAdminUser): Boolean;
+    function Find(const AName: string; out AUser: TComAdminUser): Boolean;
     property Items[Index: Integer]: TComAdminUser read GetItem; default;
   end;
 
@@ -139,7 +141,7 @@ type
     function GetItem(Index: Integer): TComAdminRole;
   public
     function Append(ASourceRole: TComAdminRole): TComAdminRole;
-    function Find(const AName: string; var ARole: TComAdminRole): Boolean;
+    function Find(const AName: string; out ARole: TComAdminRole): Boolean;
     property Items[Index: Integer]: TComAdminRole read GetItem; default;
   end;
 
@@ -338,7 +340,7 @@ type
     function BuildTargetLibraryName(ASourceComponent: TCOMAdminComponent): string;
   public
     function Append(ASourceComponent: TCOMAdminComponent): TCOMAdminComponent;
-    function Find(const AName: string; var AComponent: TCOMAdminComponent): Boolean;
+    function Find(const AName: string; out AComponent: TCOMAdminComponent): Boolean;
     property Items[Index: Integer]: TCOMAdminComponent read GetItem; default;
   end;
 
@@ -512,7 +514,7 @@ type
     function GetItem(Index: Integer): TComAdminApplication;
   public
     function Append(ASourceApplication: TComAdminApplication; const ACreatorString: string = ''): TComAdminApplication;
-    function Find(const AName: string; var AApplication: TComAdminApplication): Boolean;
+    function Find(const AName: string; out AApplication: TComAdminApplication): Boolean;
     property Items[Index: Integer]: TComAdminApplication read GetItem; default;
   end;
 
@@ -626,8 +628,13 @@ const
   COLLECTION_NAME_ROLES = 'Roles';
   COLLECTION_NAME_USERS = 'UsersInRole';
   COLLECTION_NAME_USERS_PARTITION = 'UsersInPartitionRole';
+
   DEFAULT_APP_FILTER = '*';
+
   ERROR_INVALID_LIBRARY_PATH = 'Invalid library path for server %s';
+  ERROR_NOT_FOUND = 'Element %s could not be found in this collection';
+  ERROR_OUT_OF_RANGE = 'Value out of range';
+
   PROPERTY_NAME_3GIG = '3GigSupportEnabled';
   PROPERTY_NAME_ACCESS_CHECK_LEVEL = 'AccessChecksLevel';
   PROPERTY_NAME_ACCESS_CHECKS = 'ApplicationAccessChecksEnabled';
@@ -736,8 +743,6 @@ const
   PROPERTY_NAME_SYSTEM = 'IsSystem';
   PROPERTY_NAME_TRANSACTION_TIMEOUT = 'TransactionTimeout';
   PROPERTY_NAME_USER = 'User';
-  ERROR_NOT_FOUND = 'Element %s could not be found in this collection';
-  ERROR_OUT_OF_RANGE = 'Value out of range';
 
 { TComAdminBaseObject }
 
@@ -850,7 +855,7 @@ begin
   Self.Add(Result);
 end;
 
-function TComAdminUserList.Find(const AName: string; var AUser: TComAdminUser): Boolean;
+function TComAdminUserList.Find(const AName: string; out AUser: TComAdminUser): Boolean;
 var
   i: Integer;
 begin
@@ -952,7 +957,7 @@ begin
   Self.Add(Result);
 end;
 
-function TComAdminRoleList.Find(const AName: string; var ARole: TComAdminRole): Boolean;
+function TComAdminRoleList.Find(const AName: string; out ARole: TComAdminRole): Boolean;
 var
   i: Integer;
 begin
@@ -1252,7 +1257,7 @@ begin
   Result := Format('\\%s\%s', [Catalog.Server, TPath.Combine(Catalog.LibraryPath, ExtractFileName(ASourceComponent.Dll)).Replace(':','$')]);
 end;
 
-function TCOMAdminComponentList.Find(const AName: string; var AComponent: TCOMAdminComponent): Boolean;
+function TCOMAdminComponentList.Find(const AName: string; out AComponent: TCOMAdminComponent): Boolean;
 var
   i: Integer;
 begin
@@ -1762,6 +1767,7 @@ var
   i: Integer;
   LComponent: TCOMAdminComponent;
 begin
+    // sync components in source application to target application
   for i := 0 to ASourceApplication.Components.Count - 1 do
   begin
     if FComponents.Find(ASourceApplication.Components[i].Name, LComponent) then
@@ -1770,7 +1776,7 @@ begin
     end else
       LComponent := FComponents.Append(ASourceApplication.Components[i]); // Component does not exists in target application ==> create & copy
   end;
-  // delete all applications on target server that not exists on main server
+  // delete all components in target application that not exists in source application
   for i := ASourceApplication.Components.Count - 1 downto 0 do
   begin
     if not ASourceApplication.Components.Find(ASourceApplication.Components[i].Name, LComponent) then
@@ -1783,13 +1789,19 @@ var
   i: Integer;
   LRole: TComAdminRole;
 begin
+    // sync roles in source application to target application
   for i := 0 to ASourceApplication.Roles.Count - 1 do
   begin
     if FRoles.Find(ASourceApplication.Roles[i].Name, LRole) then
-    begin
-      LRole.CopyProperties(ASourceApplication.Roles[i]);
-    end else
+      LRole.CopyProperties(ASourceApplication.Roles[i])
+    else
       LRole := FRoles.Append(ASourceApplication.Roles[i]); // Role does not exists in target application ==> create & copy
+  end;
+  // delete all roles in target application that not exists in source application
+  for i := ASourceApplication.Roles.Count - 1 downto 0 do
+  begin
+    if not ASourceApplication.Roles.Find(ASourceApplication.Roles[i].Name, LRole) then
+      Collection.Catalog.ChangeCount := Collection.Catalog.ChangeCount + ASourceApplication.Roles.Delete(i);
   end;
 end;
 
@@ -1810,7 +1822,7 @@ begin
   Self.Add(Result);
 end;
 
-function TComAdminApplicationList.Find(const AName: string; var AApplication: TComAdminApplication): Boolean;
+function TComAdminApplicationList.Find(const AName: string; out AApplication: TComAdminApplication): Boolean;
 var
   i: Integer;
 begin
