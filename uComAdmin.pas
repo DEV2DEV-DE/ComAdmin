@@ -1,7 +1,7 @@
 unit uComAdmin;
 
-// Compile with RTTI
-{$M+}
+// Compile with typeinfo for RTTI support
+{$TYPEINFO ON}
 
 // https://docs.microsoft.com/en-us/windows/win32/cossdk/com--administration-collections
 
