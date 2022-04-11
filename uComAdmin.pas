@@ -77,7 +77,6 @@ type
     FName: string;
   private
     function InternalCheckRange(AMinValue, AMaxValue, AValue: Cardinal): Boolean;
-    procedure CopyObject(ASourceObject, ATargetObject: TComAdminBaseObject);
   public
     constructor Create(ACollection: TComAdminBaseList; ACatalogObject: ICatalogObject); reintroduce;
     procedure CopyProperties(ABaseClass: TComAdminBaseObject);
@@ -746,38 +745,6 @@ const
 
 { TComAdminBaseObject }
 
-procedure TComAdminBaseObject.CopyObject(ASourceObject, ATargetObject: TComAdminBaseObject);
-var
-  LRttiContext: TRttiContext;
-  LType: TRttiType;
-  LProperty: TRttiProperty;
-  AValue, ASource, ATarget: TValue;
-begin
-  LRttiContext := TRttiContext.Create;
-  try
-    LType := LRttiContext.GetType(ASourceObject.ClassInfo);
-    ASource := TValue.From<TComAdminBaseObject>(ASourceObject);
-    ATarget := TValue.From<TComAdminBaseObject>(ATargetObject);
-
-    for LProperty in LType.GetProperties do
-    begin
-      if (LProperty.IsReadable) and (LProperty.IsWritable) and (LProperty.Visibility = mvPublished) then
-      begin
-        AValue := LProperty.GetValue(ASource.AsObject);
-        LProperty.SetValue(ATarget.AsObject, AValue);
-      end;
-    end;
-
-  finally
-    LRttiContext.Free;
-  end;
-end;
-
-procedure TComAdminBaseObject.CopyProperties(ABaseClass: TComAdminBaseObject);
-begin
-  CopyObject(ABaseClass, Self);
-end;
-
 constructor TComAdminBaseObject.Create(ACollection: TComAdminBaseList; ACatalogObject: ICatalogObject);
 begin
   inherited Create;
@@ -791,6 +758,33 @@ begin
   end;
   FKey := FCatalogObject.Key;
   FName := FCatalogObject.Name;
+end;
+
+procedure TComAdminBaseObject.CopyProperties(ABaseClass: TComAdminBaseObject);
+var
+  LRttiContext: TRttiContext;
+  LType: TRttiType;
+  LProperty: TRttiProperty;
+  AValue, ASource, ATarget: TValue;
+begin
+  LRttiContext := TRttiContext.Create;
+  try
+    LType := LRttiContext.GetType(ABaseClass.ClassInfo);
+    ASource := TValue.From<TComAdminBaseObject>(ABaseClass);
+    ATarget := TValue.From<TComAdminBaseObject>(Self);
+
+    for LProperty in LType.GetProperties do
+    begin
+      if (LProperty.IsReadable) and (LProperty.IsWritable) and (LProperty.Visibility = mvPublished) then
+      begin
+        AValue := LProperty.GetValue(ASource.AsObject);
+        LProperty.SetValue(ATarget.AsObject, AValue);
+      end;
+    end;
+
+  finally
+    LRttiContext.Free;
+  end;
 end;
 
 function TComAdminBaseObject.InternalCheckRange(AMinValue, AMaxValue, AValue: Cardinal): Boolean;
@@ -818,7 +812,7 @@ end;
 function TComAdminBaseList.Delete(Index: Integer): Integer;
 begin
   CatalogCollection.Remove(GetIndexByKey(Items[Index].Key));
-  Result := CatalogCollection.SaveChanges;
+  Result := SaveChanges;
   inherited Delete(Index);
 end;
 
@@ -851,7 +845,7 @@ begin
   LUser.Value[PROPERTY_NAME_USER] := ASourceUser.Name;
   Result := TComAdminUser.Create(Self, LUser);
   Result.Name := ASourceUser.Name;
-  Catalog.ChangeCount := Catalog.ChangeCount + CatalogCollection.SaveChanges;
+  Catalog.ChangeCount := Catalog.ChangeCount + SaveChanges;
   Self.Add(Result);
 end;
 
@@ -953,7 +947,7 @@ begin
   LRole.Value[PROPERTY_NAME_NAME] := ASourceRole.Name;
   Result := TComAdminRole.Create(Self, LRole);
   Result.CopyProperties(ASourceRole);
-  Catalog.ChangeCount := Catalog.ChangeCount + CatalogCollection.SaveChanges;
+  Catalog.ChangeCount := Catalog.ChangeCount + SaveChanges;
   Self.Add(Result);
 end;
 
@@ -1247,7 +1241,7 @@ begin
   LLibraryName := TPath.Combine(Catalog.LibraryPath, ExtractFileName(ASourceComponent.Dll));
   Result := (Owner as TComAdminApplication).InstallComponent(LLibraryName);
   Result.CopyProperties(ASourceComponent);
-  Catalog.ChangeCount := Catalog.ChangeCount + CatalogCollection.SaveChanges;
+  Catalog.ChangeCount := Catalog.ChangeCount + SaveChanges;
 end;
 
 function TCOMAdminComponentList.BuildTargetLibraryName(ASourceComponent: TCOMAdminComponent): string;
@@ -1817,7 +1811,7 @@ begin
   Result.CopyProperties(ASourceApplication);
   if not ACreatorString.IsEmpty then
     Result.CreatedBy := ACreatorString;
-  Catalog.ChangeCount := Catalog.ChangeCount + CatalogCollection.SaveChanges;
+  Catalog.ChangeCount := Catalog.ChangeCount + SaveChanges;
   Result.Key := LApplication.Key;
   Self.Add(Result);
 end;
@@ -2006,7 +2000,7 @@ begin
       if not FApplications.Find(LTargetServerCatalog.Applications[i].Name, LApplication) then
         LTargetServerCatalog.ChangeCount := LTargetServerCatalog.ChangeCount + LTargetServerCatalog.Applications.Delete(i);
     end;
-    LTargetServerCatalog.Applications.CatalogCollection.SaveChanges;
+    LTargetServerCatalog.Applications.SaveChanges;
     Result := LTargetServerCatalog.ChangeCount;
   finally
     LTargetServerCatalog.Free;
