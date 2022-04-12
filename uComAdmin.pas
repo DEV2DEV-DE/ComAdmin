@@ -1,4 +1,4 @@
-unit uComAdmin;
+﻿unit uComAdmin;
 
 // Compile with typeinfo for RTTI support
 {$TYPEINFO ON}
@@ -75,14 +75,16 @@ type
     FCollection: TComAdminBaseList;
     FKey: string;
     FName: string;
+    FSupportsUsers: Boolean;
   private
     function InternalCheckRange(AMinValue, AMaxValue, AValue: Cardinal): Boolean;
   public
     constructor Create(ACollection: TComAdminBaseList; ACatalogObject: ICatalogObject); reintroduce;
-    procedure CopyProperties(ABaseClass: TComAdminBaseObject);
+    procedure CopyProperties(ASourceObject, ATargetObject: TComAdminBaseObject);
     property CatalogCollection: ICatalogCollection read FCatalogCollection;
     property CatalogObject: ICatalogObject read FCatalogObject;
     property Collection: TComAdminBaseList read FCollection;
+    property SupportsUsers: Boolean read FSupportsUsers write FSupportsUsers default False;
   published
     property Key: string read FKey write FKey;
     property Name: string read FName write FName;
@@ -296,9 +298,11 @@ type
     procedure SetCreationTimeout(const Value: Cardinal);
     procedure SetMaxPoolSize(const Value: Cardinal);
     procedure SetMinPoolSize(const Value: Cardinal);
+    procedure SyncRoles(ASourceComponent: TCOMAdminComponent);
   public
     constructor Create(ACollection: TComAdminBaseList; ACatalogObject: ICatalogObject); reintroduce;
     destructor Destroy; override;
+    function CopyProperties(ASourceComponent: TCOMAdminComponent): Integer;
     property Roles: TComAdminRoleList read FRoles write FRoles;
   published
     property AllowInprocSubscribers: Boolean read FAllowInprocSubscribers write FAllowInprocSubscribers default True;
@@ -339,6 +343,7 @@ type
     function BuildTargetLibraryName(ASourceComponent: TCOMAdminComponent): string;
   public
     function Append(ASourceComponent: TCOMAdminComponent): TCOMAdminComponent;
+    function CopyLibrary(ASourceComponent: TCOMAdminComponent; AOverwrite: Boolean = False): Boolean;
     function Find(const AName: string; out AComponent: TCOMAdminComponent): Boolean;
     property Items[Index: Integer]: TCOMAdminComponent read GetItem; default;
   end;
@@ -395,6 +400,7 @@ type
     FSoapBaseUrl: string;
     FSoapVRoot: string;
     FSoapMailTo: string;
+    function BuildInstallFileName: string;
     procedure GetComponents;
     procedure GetRoles;
     procedure ReadExtendedProperties;
@@ -452,9 +458,11 @@ type
     destructor Destroy; override;
     function GetInstances: TComAdminInstanceList;
     function CopyProperties(ASourceApplication: TCOMAdminApplication): Integer;
+    function CopyToServer(ATargetServer: TComAdminCatalog; AOptions: Integer): Boolean;
     function GetUsersCollectionName: string;
     function InstallComponent(const ALibraryName: string): TCOMAdminComponent;
-    property Roles: TComAdminRoleList read FRoles;
+    function IsIntegratedIdentity: Boolean;
+    property Roles: TComAdminRoleList read FRoles write FRoles;
   published
     property AccessChecksEnabled: Boolean read FAccessChecksEnabled write SetAccessChecksEnabled default True;
     property AccessChecksLevel: TCOMAdminAccessChecksLevelOptions read FAccessChecksLevel write SetAccessChecksLevel default COMAdminAccessChecksApplicationComponentLevel;
@@ -512,7 +520,7 @@ type
   strict private
     function GetItem(Index: Integer): TComAdminApplication;
   public
-    function Append(ASourceApplication: TComAdminApplication; const ACreatorString: string = ''): TComAdminApplication;
+    function Append(ASourceApplication: TComAdminApplication; const ACreatorString: string = ''; const ADefaultPassword: string = ''): TComAdminApplication;
     function Find(const AName: string; out AApplication: TComAdminApplication): Boolean;
     property Items[Index: Integer]: TComAdminApplication read GetItem; default;
   end;
@@ -576,6 +584,7 @@ type
     FCatalog: ICOMAdminCatalog2;
     FChangeCount: Integer;
     FComputer: TComAdminComputer;
+    FCopyLibraries: Boolean;
     FDebug: Boolean;
     FFilter: string;
     FLibraryPath: string;
@@ -591,11 +600,13 @@ type
     procedure ExportApplication(AIndex: Integer; const AFilename: string);
     procedure ExportApplicationByKey(const AKey, AFilename: string);
     procedure ExportApplicationByName(const AName, AFilename: string);
-    function SyncToServer(const ATargetServer: string; const ACreatorString: string = ''): Integer;
+    function SyncToServer(const ATargetServer: string; const ACreatorString, ADefaultPassword: string; ACopyLibraries: Boolean = False): Integer; overload;
+    function SyncToServer(const ATargetServer: string; const ACreatorString; AOptions: Integer): Integer; overload;
     property Applications: TComAdminApplicationList read FApplications;
     property Catalog: ICOMAdminCatalog2 read FCatalog;
     property ChangeCount: Integer read FChangeCount write FChangeCount;
     property Computer: TComAdminComputer read FComputer write FComputer;
+    property CopyLibraries: Boolean read FCopyLibraries write FCopyLibraries;
     property Debug: Boolean read FDebug write FDebug default False;
     property Filter: string read FFilter write SetFilter;
     property LibraryPath: string read FLibraryPath write FLibraryPath;
@@ -630,9 +641,16 @@ const
 
   DEFAULT_APP_FILTER = '*';
 
+  ERROR_APPLICATION_NOT_DOWN = 'Application could not be shut down';
+  ERROR_COPY_LIBRARY = 'Library could not be copied to target server';
   ERROR_INVALID_LIBRARY_PATH = 'Invalid library path for server %s';
   ERROR_NOT_FOUND = 'Element %s could not be found in this collection';
-  ERROR_OUT_OF_RANGE = 'Value out of range';
+  ERROR_OUT_OF_RANGE = 'Value var of range';
+
+  IDENTITY_STRING_INTERACTIVE = 'Interactive User';
+  IDENTITY_STRING_LOCALSERVICE = 'nt authority\localservice';
+  IDENTITY_STRING_NETWORKSERVICE = 'nt authority\networkservice';
+  IDENTITY_STRING_SYSTEM = 'nt authority\system';
 
   PROPERTY_NAME_3GIG = '3GigSupportEnabled';
   PROPERTY_NAME_ACCESS_CHECK_LEVEL = 'AccessChecksLevel';
@@ -760,7 +778,7 @@ begin
   FName := FCatalogObject.Name;
 end;
 
-procedure TComAdminBaseObject.CopyProperties(ABaseClass: TComAdminBaseObject);
+procedure TComAdminBaseObject.CopyProperties(ASourceObject, ATargetObject: TComAdminBaseObject);
 var
   LRttiContext: TRttiContext;
   LType: TRttiType;
@@ -769,14 +787,15 @@ var
 begin
   LRttiContext := TRttiContext.Create;
   try
-    LType := LRttiContext.GetType(ABaseClass.ClassInfo);
-    ASource := TValue.From<TComAdminBaseObject>(ABaseClass);
-    ATarget := TValue.From<TComAdminBaseObject>(Self);
+    LType := LRttiContext.GetType(ASourceObject.ClassInfo);
+    ASource := TValue.From<TComAdminBaseObject>(ASourceObject);
+    ATarget := TValue.From<TComAdminBaseObject>(ATargetObject);
 
     for LProperty in LType.GetProperties do
     begin
       if (LProperty.IsReadable) and (LProperty.IsWritable) and (LProperty.Visibility = mvPublished) then
       begin
+        { TODO -odev2dev : also copy the properties from the source catalog object to the target }
         AValue := LProperty.GetValue(ASource.AsObject);
         LProperty.SetValue(ATarget.AsObject, AValue);
       end;
@@ -799,11 +818,11 @@ end;
 constructor TComAdminBaseList.Create(AOwner: TComAdminBaseObject; ACatalog: TComAdminCatalog; ACatalogCollection: ICatalogCollection);
 begin
   inherited Create(True);
-  FOwner := AOwner;
-  FCatalog := ACatalog;
-  FCatalogCollection := ACatalogCollection;
-  if Assigned(FCatalogCollection) then
+  if Assigned(ACatalogCollection) then
   begin
+    FOwner := AOwner;
+    FCatalog := ACatalog;
+    FCatalogCollection := ACatalogCollection;
     FName := FCatalogCollection.Name;
     FCatalogCollection.Populate;
   end;
@@ -873,13 +892,18 @@ end;
 
 function TComAdminRole.CopyProperties(ASourceRole: TComAdminRole): Integer;
 begin
-  inherited CopyProperties(ASourceRole);
+  if Collection.Owner.SupportsUsers then
+  begin
+    inherited CopyProperties(ASourceRole, Self);
 
-  // Changes must be saved before any sub-collections can be updated
-  Result := CatalogCollection.SaveChanges;
+    // Changes must be saved before any sub-collections can be updated
+    Result := Collection.SaveChanges;
 
-  // Synchronize users from source role
-  SyncUsers(ASourceRole);
+    // Synchronize users from source role
+    SyncUsers(ASourceRole);
+
+  end else
+    Result := 0;
 end;
 
 constructor TComAdminRole.Create(ACollection: TComAdminBaseList; ACatalogObject: ICatalogObject);
@@ -998,6 +1022,7 @@ end;
 constructor TComAdminPartition.Create(ACollection: TComAdminBaseList; ACatalogObject: ICatalogObject);
 begin
   inherited Create(ACollection, ACatalogObject);
+  SupportsUsers := True;
   FRoles := TComAdminRoleList.Create(Self, ACollection.Catalog, ACollection.CatalogCollection.GetCollection(COLLECTION_NAME_PARTITION_ROLES, Key) as ICatalogCollection);
   ReadExtendedProperties;
   GetRoles;
@@ -1130,6 +1155,17 @@ end;
 
 { TCOMAdminComponent }
 
+function TCOMAdminComponent.CopyProperties(ASourceComponent: TCOMAdminComponent): Integer;
+begin
+  inherited CopyProperties(ASourceComponent, Self);
+
+  // Changes must be saved before any sub-collections can be updated
+  Result := CatalogCollection.SaveChanges;
+
+  // Synchronize roles from source component
+  SyncRoles(ASourceComponent);
+end;
+
 constructor TCOMAdminComponent.Create(ACollection: TComAdminBaseList; ACatalogObject: ICatalogObject);
 begin
   inherited Create(ACollection, ACatalogObject);
@@ -1200,48 +1236,62 @@ end;
 procedure TCOMAdminComponent.SetComponentTransactionTimeout(const Value: Cardinal);
 begin
   if InternalCheckRange(0, MAX_TIMEOUT, Value) then
-    FComponentTransactionTimeout := Value
-  else
-    raise EArgumentOutOfRangeException.Create(ERROR_OUT_OF_RANGE);
+    FComponentTransactionTimeout := Value;
 end;
 
 procedure TCOMAdminComponent.SetCreationTimeout(const Value: Cardinal);
 begin
   if InternalCheckRange(0, MAXLONG, Value) then
-    FCreationTimeout := Value
-  else
-    raise EArgumentOutOfRangeException.Create(ERROR_OUT_OF_RANGE);
+    FCreationTimeout := Value;
 end;
 
 procedure TCOMAdminComponent.SetMaxPoolSize(const Value: Cardinal);
 begin
   if InternalCheckRange(1, MAX_POOL_SIZE, Value) then
-    FMaxPoolSize := Value
-  else
-    raise EArgumentOutOfRangeException.Create(ERROR_OUT_OF_RANGE);
+    FMaxPoolSize := Value;
 end;
 
 procedure TCOMAdminComponent.SetMinPoolSize(const Value: Cardinal);
 begin
   if InternalCheckRange(0, MAX_POOL_SIZE, Value) then
-    FMinPoolSize := Value
-  else
-    raise EArgumentOutOfRangeException.Create(ERROR_OUT_OF_RANGE);
+    FMinPoolSize := Value;
+end;
+
+procedure TCOMAdminComponent.SyncRoles(ASourceComponent: TCOMAdminComponent);
+var
+  i: Integer;
+  LRole: TComAdminRole;
+begin
+    // sync roles in source component to target component
+  for i := 0 to ASourceComponent.Roles.Count - 1 do
+  begin
+    if FRoles.Find(ASourceComponent.Roles[i].Name, LRole) then
+      LRole.CopyProperties(ASourceComponent.Roles[i])
+    else
+      LRole := FRoles.Append(ASourceComponent.Roles[i]); // Role does not exists in target component ==> create & copy
+  end;
+  // delete all roles in target component that not exists in source component
+  for i := ASourceComponent.Roles.Count - 1 downto 0 do
+  begin
+    if not ASourceComponent.Roles.Find(ASourceComponent.Roles[i].Name, LRole) then
+      Collection.Catalog.ChangeCount := Collection.Catalog.ChangeCount + ASourceComponent.Roles.Delete(i);
+  end;
 end;
 
 { TCOMAdminComponentList }
 
 function TCOMAdminComponentList.Append(ASourceComponent: TCOMAdminComponent): TCOMAdminComponent;
 var
-  LLibraryName, LTargetLibrary: string;
+  LLibraryName: string;
 begin
-  LTargetLibrary := BuildTargetLibraryName(ASourceComponent);
-  if not FileExists(LTargetLibrary) then
-    TFile.Copy(ASourceComponent.Dll, LTargetLibrary);
-  LLibraryName := TPath.Combine(Catalog.LibraryPath, ExtractFileName(ASourceComponent.Dll));
-  Result := (Owner as TComAdminApplication).InstallComponent(LLibraryName);
-  Result.CopyProperties(ASourceComponent);
-  Catalog.ChangeCount := Catalog.ChangeCount + SaveChanges;
+  if CopyLibrary(ASourceComponent) then
+  begin
+    LLibraryName := TPath.Combine(Catalog.LibraryPath, ExtractFileName(ASourceComponent.Dll));
+    Result := (Owner as TComAdminApplication).InstallComponent(LLibraryName);
+    Result.CopyProperties(ASourceComponent);
+    Catalog.ChangeCount := Catalog.ChangeCount + SaveChanges;
+  end else
+    raise Exception.Create(ERROR_COPY_LIBRARY);
 end;
 
 function TCOMAdminComponentList.BuildTargetLibraryName(ASourceComponent: TCOMAdminComponent): string;
@@ -1249,6 +1299,26 @@ begin
   if Catalog.LibraryPath.IsEmpty then
     raise Exception.CreateFmt(ERROR_INVALID_LIBRARY_PATH, [Catalog.Server]);
   Result := Format('\\%s\%s', [Catalog.Server, TPath.Combine(Catalog.LibraryPath, ExtractFileName(ASourceComponent.Dll)).Replace(':','$')]);
+end;
+
+function TCOMAdminComponentList.CopyLibrary(ASourceComponent: TCOMAdminComponent; AOverwrite: Boolean): Boolean;
+var
+  LTargetLibrary: string;
+begin
+  LTargetLibrary := BuildTargetLibraryName(ASourceComponent);
+  if AOverwrite or not FileExists(LTargetLibrary) then
+  begin
+    if (Owner as TComAdminApplication).Instances.Count > 0 then
+    begin
+      Catalog.Catalog.ShutdownApplication(Owner.Key);
+      if (Owner as TComAdminApplication).Instances.Count = 0 then
+        TFile.Copy(ASourceComponent.Dll, LTargetLibrary, AOverwrite)
+      else
+        raise Exception.Create(ERROR_APPLICATION_NOT_DOWN);
+    end else
+      TFile.Copy(ASourceComponent.Dll, LTargetLibrary, AOverwrite);
+  end;
+  Result := FileExists(LTargetLibrary);
 end;
 
 function TCOMAdminComponentList.Find(const AName: string; out AComponent: TCOMAdminComponent): Boolean;
@@ -1273,10 +1343,17 @@ end;
 
 { TComAdminApplication }
 
+function TComAdminApplication.BuildInstallFileName: string;
+begin
+  if Collection.Catalog.LibraryPath.IsEmpty then
+    raise Exception.CreateFmt(ERROR_INVALID_LIBRARY_PATH, [Collection.Catalog.Server]);
+  Result := Format('\\%s\%s\%s.msi', [Collection.Catalog.Server, Collection.Catalog.LibraryPath, Name]);
+end;
+
 function TComAdminApplication.CopyProperties(ASourceApplication: TCOMAdminApplication): Integer;
 begin
 
-  inherited CopyProperties(ASourceApplication);
+  inherited CopyProperties(ASourceApplication, Self);
 
   // Changes must be saved before any sub-collections can be updated
   Result := CatalogCollection.SaveChanges;
@@ -1287,16 +1364,48 @@ begin
 
 end;
 
+function TComAdminApplication.CopyToServer(ATargetServer: TComAdminCatalog; AOptions: Integer): Boolean;
+var
+  i: Integer;
+  LInstallFileName: string;
+begin
+  for i := 0 to ATargetServer.Applications.Count - 1 do
+  begin
+    if ATargetServer.Applications[i].Name.Equals(Name) then
+    begin
+      // create filename for installation file
+      LInstallFileName := BuildInstallFileName;
+      // export application to file
+      Collection.Catalog.ExportApplicationByKey(Key, LInstallFileName);
+      // shutdown application on target server
+      ATargetServer.Catalog.ShutdownApplication(ATargetServer.Applications[i].Key);
+      // delete existing application on target server
+      ATargetServer.Applications.Delete(i);
+      // install application on target server
+      ATargetServer.Catalog.InstallApplication(LInstallFileName, ATargetServer.LibraryPath, AOptions, '', '', '');
+      // delete installation files as they are no longer needed
+      TFile.Delete(LInstallFileName);
+      TFile.Delete(Format('%s.cab', [LInstallFileName]));
+      Exit(True);
+    end;
+  end;
+  Result := False;
+end;
+
 constructor TComAdminApplication.Create(ACollection: TComAdminBaseList; ACatalogObject: ICatalogObject);
 begin
   inherited Create(ACollection, ACatalogObject);
+
+  SupportsUsers := True;
   ReadExtendedProperties;
+
   // Create List objects
   FInstances := TComAdminInstanceList.Create(Self, ACollection.Catalog, ACollection.CatalogCollection.GetCollection(COLLECTION_NAME_INSTANCES, Key) as ICatalogCollection);
-  GetInstances;
   FRoles := TComAdminRoleList.Create(Self, ACollection.Catalog, ACollection.CatalogCollection.GetCollection(COLLECTION_NAME_ROLES, Key) as ICatalogCollection);
-  GetRoles;
   FComponents := TCOMAdminComponentList.Create(Self, ACollection.Catalog, ACollection.CatalogCollection.GetCollection(COLLECTION_NAME_COMPONENTS, Key) as ICatalogCollection);
+
+  GetInstances;
+  GetRoles;
   GetComponents;
 end;
 
@@ -1335,6 +1444,14 @@ begin
   FComponents.CatalogCollection.Populate; // muste be populated to retrieve the newly installed component
   FComponents.Add(TCOMAdminComponent.Create(FComponents, (FComponents.CatalogCollection.Item[FComponents.CatalogCollection.Count - 1]) as ICatalogObject));
   Result := FComponents.Items[FComponents.Count - 1] as TCOMAdminComponent;
+end;
+
+function TComAdminApplication.IsIntegratedIdentity: Boolean;
+begin
+  Result := FIdentity.Equals(IDENTITY_STRING_INTERACTIVE)
+         or FIdentity.Equals(IDENTITY_STRING_LOCALSERVICE)
+         or FIdentity.Equals(IDENTITY_STRING_NETWORKSERVICE)
+         or FIdentity.Equals(IDENTITY_STRING_SYSTEM);
 end;
 
 function TComAdminApplication.GetInstances: TComAdminInstanceList;
@@ -1767,6 +1884,8 @@ begin
     if FComponents.Find(ASourceApplication.Components[i].Name, LComponent) then
     begin
       LComponent.CopyProperties(ASourceApplication.Components[i]);
+      if Collection.Catalog.CopyLibraries then
+        FComponents.CopyLibrary(ASourceApplication.Components[i], True);
     end else
       LComponent := FComponents.Append(ASourceApplication.Components[i]); // Component does not exists in target application ==> create & copy
   end;
@@ -1789,7 +1908,7 @@ begin
     if FRoles.Find(ASourceApplication.Roles[i].Name, LRole) then
       LRole.CopyProperties(ASourceApplication.Roles[i])
     else
-      LRole := FRoles.Append(ASourceApplication.Roles[i]); // Role does not exists in target application ==> create & copy
+      {LRole := }FRoles.Append(ASourceApplication.Roles[i]); // Role does not exists in target application ==> create & copy
   end;
   // delete all roles in target application that not exists in source application
   for i := ASourceApplication.Roles.Count - 1 downto 0 do
@@ -1801,12 +1920,14 @@ end;
 
 { TComAdminApplicationList }
 
-function TComAdminApplicationList.Append(ASourceApplication: TComAdminApplication; const ACreatorString: string): TComAdminApplication;
+function TComAdminApplicationList.Append(ASourceApplication: TComAdminApplication; const ACreatorString: string; const ADefaultPassword: string): TComAdminApplication;
 var
   LApplication: ICatalogObject;
 begin
   LApplication := CatalogCollection.Add as ICatalogObject;
   LApplication.Value[PROPERTY_NAME_NAME] := ASourceApplication.Name;
+  if not ASourceApplication.IsIntegratedIdentity then
+    LApplication.Value[PROPERTY_NAME_PASSWORD] := ADefaultPassword;
   Result := TComAdminApplication.Create(Self, LApplication);
   Result.CopyProperties(ASourceApplication);
   if not ACreatorString.IsEmpty then
@@ -1875,9 +1996,7 @@ end;
 procedure TComAdminComputer.SetTransactionTimeout(const Value: Cardinal);
 begin
   if InternalCheckRange(1, MAX_TIMEOUT, Value) then
-    FTransactionTimeout := Value
-  else
-    raise EArgumentOutOfRangeException.Create(ERROR_OUT_OF_RANGE);
+    FTransactionTimeout := Value;
 end;
 
 { TComAdminCatalog }
@@ -1973,7 +2092,7 @@ begin
   end;
 end;
 
-function TComAdminCatalog.SyncToServer(const ATargetServer: string; const ACreatorString: string): Integer;
+function TComAdminCatalog.SyncToServer(const ATargetServer: string; const ACreatorString; AOptions: Integer): Integer;
 var
   LTargetServerCatalog: TComAdminCatalog;
   LApplication: TComAdminApplication;
@@ -1981,8 +2100,35 @@ var
 begin
   LTargetServerCatalog := TComAdminCatalog.Create(ATargetServer, FFilter, FOnReadObject);
   try
-    LTargetServerCatalog.LibraryPath := FLibraryPath;
     LTargetServerCatalog.ChangeCount := 0;
+    LTargetServerCatalog.LibraryPath := FLibraryPath;
+    // sync applications from main server to target server
+    for i := 0 to FApplications.Count - 1 do
+      LApplication.CopyToServer(LTargetServerCatalog, AOptions); // Application exists on target server ==> copy properties
+    // delete all applications on target server that not exists on main server
+    for i := LTargetServerCatalog.Applications.Count - 1 downto 0 do
+    begin
+      if not FApplications.Find(LTargetServerCatalog.Applications[i].Name, LApplication) then
+        LTargetServerCatalog.ChangeCount := LTargetServerCatalog.ChangeCount + LTargetServerCatalog.Applications.Delete(i);
+    end;
+    LTargetServerCatalog.Applications.SaveChanges;
+    Result := LTargetServerCatalog.ChangeCount;
+  finally
+    LTargetServerCatalog.Free;
+  end;
+end;
+
+function TComAdminCatalog.SyncToServer(const ATargetServer: string; const ACreatorString, ADefaultPassword: string; ACopyLibraries: Boolean): Integer;
+var
+  LTargetServerCatalog: TComAdminCatalog;
+  LApplication: TComAdminApplication;
+  i: Integer;
+begin
+  LTargetServerCatalog := TComAdminCatalog.Create(ATargetServer, FFilter, FOnReadObject);
+  try
+    LTargetServerCatalog.ChangeCount := 0;
+    LTargetServerCatalog.CopyLibraries := ACopyLibraries;
+    LTargetServerCatalog.LibraryPath := FLibraryPath;
     // sync applications from main server to target server
     for i := 0 to FApplications.Count - 1 do
     begin
@@ -1992,7 +2138,7 @@ begin
         if not ACreatorString.IsEmpty then
           LApplication.CreatedBy := ACreatorString;
       end else
-        LTargetServerCatalog.Applications.Append(FApplications[i], ACreatorString); // Application does not exists on target server ==> create & copy
+        LTargetServerCatalog.Applications.Append(FApplications[i], ACreatorString, ADefaultPassword); // Application does not exists on target server ==> create & copy
     end;
     // delete all applications on target server that not exists on main server
     for i := LTargetServerCatalog.Applications.Count - 1 downto 0 do
