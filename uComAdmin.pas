@@ -58,7 +58,7 @@ const
   IID_IUserCollection: TGUID = '{C29ADAEE-CB81-4D36-BEDF-9F131094D9A5}';
 
 type
-  // Interface to check for objects that have a roles collection
+  // Interface for objects that have a users collection
   IUserCollection = Interface(IInterface)
     ['{C29ADAEE-CB81-4D36-BEDF-9F131094D9A5}']
     function GetUsersCollectionName: string;
@@ -497,6 +497,8 @@ type
     function GetUsersCollectionName: string;
     function InstallComponent(const ALibraryName: string): TCOMAdminComponent;
     function IsIntegratedIdentity: Boolean;
+    property Components: TCOMAdminComponentList read FComponents;
+    property Instances: TComAdminInstanceList read FInstances;
     property Roles: TComAdminRoleList read FRoles write FRoles;
   published
     property AccessChecksEnabled: Boolean read FAccessChecksEnabled write SetAccessChecksEnabled default True;
@@ -506,7 +508,6 @@ type
     property AuthenticationLevel: TCOMAdminAuthenticationLevel read FAuthenticationLevel write SetAuthenticationLevel default COMAdminAuthenticationDefault;
     property Changeable: Boolean read FChangeable write SetChangeable default True;
     property CommandLine: string read FCommandLine write SetCommandLine;
-    property Components: TCOMAdminComponentList read FComponents;
     property ConcurrentApps: Cardinal read FConcurrentApps write SetConcurrentApps default 1;
     property CreatedBy: string read FCreatedBy write SetCreatedBy;
     property CRMEnabled: Boolean read FCRMEnabled write SetCRMEnabled default False;
@@ -522,7 +523,6 @@ type
     property Gig3SupportEnabled: Boolean read FGig3SupportEnabled write SetGig3SupportEnabled default False;
     property Identity: string read FIdentity write SetIdentity;
     property ImpersonationLevel: TCOMAdminImpersonationLevel read FImpersonationLevel write SetImpersonationLevel default COMAdminImpersonationImpersonate;
-    property Instances: TComAdminInstanceList read FInstances;
     property IsEnabled: Boolean read FIsEnabled write SetIsEnabled default True;
     property IsSystem: Boolean read FIsSystem default False;
     property MaxDumpCount: Cardinal read FMaxDumpCount write SetMaxDumpCount default DEFAULT_MAX_DUMP;
