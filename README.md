@@ -2,7 +2,7 @@
 ![](https://tokei.rs/b1/github/DEV2DEV-DE/ComAdmin?category=code)
 ![](https://tokei.rs/b1/github/DEV2DEV-DE/ComAdmin?category=files)
 
-Delphi wrapper around the COM+ administration for Windows
+Delphi wrapper for the COM+ administration for Windows
 
 Links to MS documentation:
 
@@ -20,7 +20,7 @@ https://docs.microsoft.com/en-us/windows/win32/cossdk/com--administration-collec
           ∞ Users (+/-) 
             ● User
       ∞ Components (-)
-        ● Component (wip)
+        ● Component
           ∞ Roles (+/-)
             ● Role
           ∞ Interfaces
@@ -33,7 +33,7 @@ https://docs.microsoft.com/en-us/windows/win32/cossdk/com--administration-collec
                     ● Role
   ● Computer
   ∞ Partitions (+/-)
-    ● Partition (wip)
+    ● Partition
       ∞ Roles
         ● Role
           ∞ Users (+/-) 
