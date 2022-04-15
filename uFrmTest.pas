@@ -10,11 +10,11 @@ type
   TFrmTest = class(TForm)
     tvTree: TTreeView;
     memoLog: TMemo;
-    Panel1: TPanel;
+    pnlTop: TPanel;
     btnComAdmin: TButton;
     cmbServerFrom: TComboBox;
     btnSync: TButton;
-    Splitter1: TSplitter;
+    splSplitter: TSplitter;
     cmbServerTo: TComboBox;
     ilSmall: TImageList;
     txtFilter: TEdit;
@@ -139,7 +139,8 @@ end;
 procedure TFrmTest.OnReadCOMObject(const AObjectType, AObjectName: string);
 begin
   memoLog.Lines.AddPair(AObjectType, AObjectName);
-  memoLog.ScrollBy(0, 1)
+  memoLog.ScrollBy(0, 1);
+  Application.ProcessMessages;
 end;
 
 end.

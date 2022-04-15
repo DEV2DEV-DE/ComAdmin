@@ -12,7 +12,7 @@ object FrmTest: TFrmTest
   Font.Style = []
   Position = poScreenCenter
   TextHeight = 13
-  object Splitter1: TSplitter
+  object splSplitter: TSplitter
     Left = 0
     Top = 369
     Width = 792
@@ -62,7 +62,7 @@ object FrmTest: TFrmTest
     ShowHint = True
     TabOrder = 1
   end
-  object Panel1: TPanel
+  object pnlTop: TPanel
     Left = 0
     Top = 0
     Width = 792
