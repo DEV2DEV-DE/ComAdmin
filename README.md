@@ -38,6 +38,10 @@ https://docs.microsoft.com/en-us/windows/win32/cossdk/com--administration-collec
         ● Role
           ∞ Users (+/-) 
             ● User
+  ∞ Protocols (+/-)
+    ● Protocol
+  ∞ EventClasses (+/-)
+    ● EventClass
 ```
 \+ This collection supports an Add method
 
