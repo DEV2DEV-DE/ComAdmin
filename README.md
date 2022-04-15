@@ -20,7 +20,7 @@ https://docs.microsoft.com/en-us/windows/win32/cossdk/com--administration-collec
           ∞ Users (+/-) 
             ● User
       ∞ Components (-)
-        ● Component (wip)
+        ● Component
           ∞ Roles (+/-)
             ● Role
           ∞ Interfaces
@@ -33,7 +33,7 @@ https://docs.microsoft.com/en-us/windows/win32/cossdk/com--administration-collec
                     ● Role
   ● Computer
   ∞ Partitions (+/-)
-    ● Partition (wip)
+    ● Partition
       ∞ Roles
         ● Role
           ∞ Users (+/-) 
