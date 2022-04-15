@@ -28,6 +28,7 @@ object FrmTest: TFrmTest
     Top = 70
     Width = 776
     Height = 295
+    Hint = 'The COM catalog of the main server'
     Margins.Left = 8
     Margins.Top = 8
     Margins.Right = 8
@@ -35,10 +36,10 @@ object FrmTest: TFrmTest
     Align = alClient
     Images = ilSmall
     Indent = 19
+    ParentShowHint = False
     ReadOnly = True
+    ShowHint = True
     TabOrder = 0
-    ExplicitWidth = 417
-    ExplicitHeight = 299
   end
   object memoLog: TMemo
     AlignWithMargins = True
@@ -46,6 +47,7 @@ object FrmTest: TFrmTest
     Top = 376
     Width = 776
     Height = 201
+    Hint = 'The log for the catalog'
     Margins.Left = 8
     Margins.Top = 4
     Margins.Right = 8
@@ -55,9 +57,10 @@ object FrmTest: TFrmTest
     BevelKind = bkFlat
     BevelOuter = bvRaised
     BorderStyle = bsNone
+    ParentShowHint = False
     ScrollBars = ssVertical
+    ShowHint = True
     TabOrder = 1
-    ExplicitWidth = 417
   end
   object Panel1: TPanel
     Left = 0
@@ -67,7 +70,6 @@ object FrmTest: TFrmTest
     Align = alTop
     BevelOuter = bvNone
     TabOrder = 2
-    ExplicitWidth = 433
     DesignSize = (
       792
       62)
@@ -76,50 +78,75 @@ object FrmTest: TFrmTest
       Top = 8
       Width = 75
       Height = 25
+      Hint = 'Read from server'
       Caption = 'Read'
+      ParentShowHint = False
+      ShowHint = True
       TabOrder = 0
       OnClick = btnComAdminClick
     end
     object cmbServerFrom: TComboBox
       Left = 89
       Top = 10
-      Width = 614
+      Width = 464
       Height = 21
+      Hint = 'Server name to read from'
       Anchors = [akLeft, akTop, akRight]
+      ParentShowHint = False
+      ShowHint = True
       TabOrder = 1
       Items.Strings = (
         ''
-        'defthwa0063srv'
-        'defthwa006dsrv'
-        'defthwa006esrv'
-        'defthwa006fsrv')
-      ExplicitWidth = 255
+        'server_001'
+        'server_002'
+        'server_003'
+        'server_004')
     end
     object btnSync: TButton
       Left = 709
       Top = 35
       Width = 75
       Height = 25
+      Hint = 'Synchronize from main to target server'
       Anchors = [akTop, akRight]
       Caption = 'Sync'
+      ParentShowHint = False
+      ShowHint = True
       TabOrder = 2
       OnClick = btnSyncClick
-      ExplicitLeft = 350
     end
     object cmbServerTo: TComboBox
       Left = 89
       Top = 37
       Width = 614
       Height = 21
+      Hint = 'Server name to synchronize to'
       Anchors = [akLeft, akTop, akRight]
+      ParentShowHint = False
+      ShowHint = True
       TabOrder = 3
       Items.Strings = (
         ''
-        'defthwa0063srv'
-        'defthwa006dsrv'
-        'defthwa006esrv'
-        'defthwa006fsrv')
-      ExplicitWidth = 255
+        'server_001'
+        'server_002'
+        'server_003'
+        'server_004')
+    end
+    object txtFilter: TEdit
+      Left = 559
+      Top = 10
+      Width = 144
+      Height = 21
+      Hint = 'Filter for applications'
+      Anchors = [akTop, akRight]
+      BevelInner = bvNone
+      BevelKind = bkFlat
+      BevelOuter = bvRaised
+      BorderStyle = bsNone
+      ParentShowHint = False
+      ShowHint = True
+      TabOrder = 4
+      Text = '*'
     end
   end
   object ilSmall: TImageList

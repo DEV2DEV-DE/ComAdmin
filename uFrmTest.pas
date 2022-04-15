@@ -17,6 +17,7 @@ type
     Splitter1: TSplitter;
     cmbServerTo: TComboBox;
     ilSmall: TImageList;
+    txtFilter: TEdit;
     procedure btnComAdminClick(Sender: TObject);
     procedure btnSyncClick(Sender: TObject);
   private
@@ -44,10 +45,11 @@ var
   AppNode, CompNode, IntfNode, MethodNode, RoleNode, UserNode: TTreeNode;
   k: Integer;
   l: Integer;
+  m: Integer;
 begin
   tvTree.Items.Clear;
   memoLog.Clear;
-  LCatalog := TComAdminCatalog.Create(cmbServerFrom.Text, 'ProdLog-*', OnReadCOMObject);
+  LCatalog := TComAdminCatalog.Create(cmbServerFrom.Text, txtFilter.Text, OnReadCOMObject);
   try
     LCatalog.LibraryPath := 'C:\Temp';
     //LCatalog.ExportApplication(20, 'D:\Test123.msi');
@@ -71,6 +73,12 @@ begin
             MethodNode := tvTree.Items.AddChild(IntfNode, LCatalog.Applications[i].Components[j].Interfaces[k].Methods[l].Name);
             MethodNode.ImageIndex := 3;
             MethodNode.SelectedIndex := 3;
+            for m := 0 to LCatalog.Applications[i].Components[j].Interfaces[k].Methods[l].Roles.Count - 1 do
+            begin
+              RoleNode := tvTree.Items.AddChild(MethodNode, LCatalog.Applications[i].Components[j].Interfaces[k].Methods[l].Roles[m].Name);
+              RoleNode.ImageIndex := 4;
+              RoleNode.SelectedIndex := 4;
+            end;
           end;
           for l := 0 to LCatalog.Applications[i].Components[j].Interfaces[k].Roles.Count - 1 do
           begin
@@ -110,7 +118,7 @@ var
   LCatalog: TComAdminCatalog;
 begin
   memoLog.Clear;
-  LCatalog := TComAdminCatalog.Create(cmbServerFrom.Text, 'ProdLog-*', OnReadCOMObject);
+  LCatalog := TComAdminCatalog.Create(cmbServerFrom.Text, txtFilter.Text, OnReadCOMObject);
   try
     LCatalog.LibraryPath := 'C:\Temp';
     LCatalog.OnDebug := OnDebugMessage;
