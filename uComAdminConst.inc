@@ -4,9 +4,9 @@ const
   DEBUG_MESSAGE_COPY_LIBRARY = '[COMAdmin] Copy library %s';
   DEBUG_MESSAGE_DELETE_ROLE = '[COMAdmin] Deleting role %s from application %s on server %s';
   DEBUG_MESSAGE_GET_PASSWORD = '[COMAdmin] Using password for identity ''%s''';
-  DEBUG_MESSAGE_START_SYNC = '[COMAdmin] Synchronizing servers from ''%s'' to ''%s''';
   DEBUG_MESSAGE_SET_PROPERTY = '[COMAdmin] Setting property ''%s'' to value ''%s''';
   DEBUG_MESSAGE_SET_PROPERTY_ERROR = '[COMAdmin] Error setting property: %s';
+  DEBUG_MESSAGE_START_SYNC = '[COMAdmin] Synchronizing servers from ''%s'' to ''%s''';
   DEBUG_MESSAGE_SYNC_APPLICATION = '[COMAdmin] Synchronizing COM-Application ''%s''';
   DEBUG_MESSAGE_SYNC_COMPLETED = '[COMAdmin] Synchronizing successfully completed';
   DEBUG_MESSAGE_SYNC_COMPONENT = '[COMAdmin] Synchronizing component ''%s''';
@@ -28,18 +28,18 @@ const
   // ==================================================================================
   COLLECTION_NAME_APPLICATION_CLUSTER = 'ApplicationCluster';
   COLLECTION_NAME_APPS = 'Applications';
-  COLLECTION_NAME_COMPONENTS = 'Components';
   COLLECTION_NAME_COMPONENT_ROLES = 'RolesForComponent';
+  COLLECTION_NAME_COMPONENTS = 'Components';
   COLLECTION_NAME_COMPUTER = 'LocalComputer';
   COLLECTION_NAME_DCOM_PROTOCOLS = 'DCOMProtocols';
   COLLECTION_NAME_EVENT_CLASSES = 'EventClassesForIID';
   COLLECTION_NAME_INSTANCES = 'ApplicationInstances';
-  COLLECTION_NAME_INTERFACES = 'InterfacesForComponent';
   COLLECTION_NAME_INTERFACE_ROLES = 'RolesForInterface';
-  COLLECTION_NAME_METHODS = 'MethodsForInterface';
+  COLLECTION_NAME_INTERFACES = 'InterfacesForComponent';
   COLLECTION_NAME_METHOD_ROLES = 'RolesForMethod';
-  COLLECTION_NAME_PARTITIONS = 'Partitions';
+  COLLECTION_NAME_METHODS = 'MethodsForInterface';
   COLLECTION_NAME_PARTITION_ROLES = 'RolesForPartition';
+  COLLECTION_NAME_PARTITIONS = 'Partitions';
   COLLECTION_NAME_ROLES = 'Roles';
   COLLECTION_NAME_USERS = 'UsersInRole';
   COLLECTION_NAME_USERS_PARTITION = 'UsersInPartitionRole';
@@ -65,11 +65,11 @@ const
   PROPERTY_NAME_CHANGEABLE = 'Changeable';
   PROPERTY_NAME_CIS_ENABLED = 'CISEnabled';
   PROPERTY_NAME_CLSID = 'CLSID';
+  PROPERTY_NAME_COM_TIINTRINSICS = 'COMTIIntrinsics';
   PROPERTY_NAME_COMMAND_LINE = 'CommandLine';
   PROPERTY_NAME_COMPONENT_ACCESS_CHECKS = 'ComponentAccessChecksEnabled';
   PROPERTY_NAME_COMPONENT_TIMEOUT = 'ComponentTransactionTimeout';
   PROPERTY_NAME_COMPONENT_TIMEOUT_ENABLED = 'ComponentTransactionTimeoutEnabled';
-  PROPERTY_NAME_COM_TIINTRINSICS = 'COMTIIntrinsics';
   PROPERTY_NAME_CONCURRENT_APPS = 'ConcurrentApps';
   PROPERTY_NAME_CONSTRUCTION_ENABLED = 'ConstructionEnabled';
   PROPERTY_NAME_CONSTRUCTOR_STRING = 'ConstructorString';
@@ -90,8 +90,8 @@ const
   PROPERTY_NAME_DUMP_FAILFAST = 'DumpOnFailfast';
   PROPERTY_NAME_DUMP_PATH = 'DumpPath';
   PROPERTY_NAME_ENABLED = 'IsEnabled';
-  PROPERTY_NAME_EVENTS_ENABLED = 'EventsEnabled';
   PROPERTY_NAME_EVENT_TRACKING = 'EventTrackingEnabled';
+  PROPERTY_NAME_EVENTS_ENABLED = 'EventsEnabled';
   PROPERTY_NAME_EXCEPTION_CLASS = 'ExceptionClass';
   PROPERTY_NAME_FIRE_IN_PARALLEL = 'FireInParallel';
   PROPERTY_NAME_ID = 'ID';
@@ -112,14 +112,14 @@ const
   PROPERTY_NAME_LOAD_BALANCING_ID = 'LoadBalancingCLSID';
   PROPERTY_NAME_MAX_DUMPS = 'MaxDumpCount';
   PROPERTY_NAME_MAX_POOL_SIZE = 'MaxPoolSize';
-  PROPERTY_NAME_MIN_POOL_SIZE = 'MinPoolSize';
   PROPERTY_NAME_MI_FILTER_CLSID = 'MultiInterfacePublisherFilterCLSID';
+  PROPERTY_NAME_MIN_POOL_SIZE = 'MinPoolSize';
   PROPERTY_NAME_MUST_RUN_CLIENT_CONTEXT = 'MustRunInClientContext';
   PROPERTY_NAME_MUST_RUN_DEFAULT_CONTEXT = 'MustRunInDefaultContext';
   PROPERTY_NAME_NAME = 'Name';
   PROPERTY_NAME_OBJECT_POOLING = 'ObjectPoolingEnabled';
-  PROPERTY_NAME_ORDER = 'Order';
   PROPERTY_NAME_OPERATING_SYSTEM = 'OperatingSystem';
+  PROPERTY_NAME_ORDER = 'Order';
   PROPERTY_NAME_PARTITION_ID = 'AppPartitionID';
   PROPERTY_NAME_PARTITION_LOOKUP = 'LocalPartitionLookupEnabled';
   PROPERTY_NAME_PARTITIONS_ENABLED = 'PartitionsEnabled';
@@ -161,4 +161,4 @@ const
   PROPERTY_NAME_SYSTEM = 'IsSystem';
   PROPERTY_NAME_TRANSACTION_TIMEOUT = 'TransactionTimeout';
   PROPERTY_NAME_USER = 'User';
-  
+
