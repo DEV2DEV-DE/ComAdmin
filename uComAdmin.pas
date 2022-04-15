@@ -36,11 +36,14 @@ type
                               COMAdminOSWindowsBlueDatacenterServer, COMAdminOSWindowsBlueWebServer);
   TCOMAdminQCAuthenticateMsgs = (COMAdminQCMessageAuthenticateSecureApps, COMAdminQCMessageAuthenticateOff, COMAdminQCMessageAuthenticateOn);
   TCOMAdminSRPTrustLevel = (COMAdminSRPDisallow = $0, COMAminSRPFullyTrusted = $40000);
+  TCOMAdminProtocol = (COMAdminProtocolTCP, COMAdminProtocolHTTP, COMAdminProtocolSPX);
 
   TComAdminReadEvent = procedure (const AObjectType, AObjectName: string) of object;
   TComAdminDebug = procedure(const AMessage: string) of object;
 
 const
+  COM_ADMIN_PROTOCOLS: array[COMAdminProtocolTCP..COMAdminProtocolSPX] of string = ('ncacn_ip_tcp', 'ncacn_http', 'ncacn_spx');
+
   DEFAULT_CREATION_TIMEOUT = 60000;
   DEFAULT_MAX_DUMP = 5;
   DEFAULT_MAX_POOL = 1048576;
@@ -385,19 +388,11 @@ type
 
   TComAdminApplication = class(TComAdminBaseObject, IUserCollection)
   strict private
-    FRoles: TComAdminRoleList;
-    FInstances: TComAdminInstanceList;
-    FDescription: string;
-    FGig3SupportEnabled: Boolean;
+    FAccessChecksEnabled: Boolean;
     FAccessChecksLevel: TCOMAdminAccessChecksLevelOptions;
     FActivation: TCOMAdminApplicationActivation;
-    FAccessChecksEnabled: Boolean;
-    FDirectory: string;
-    FProxy: Boolean;
-    FProxyServerName: string;
-    FPartitionID: string;
-    FAuthenticationLevel: TCOMAdminAuthenticationLevel;
     FAuthenticationCapability: TCOMAdminAuthenticationCapability;
+    FAuthenticationLevel: TCOMAdminAuthenticationLevel;
     FChangeable: Boolean;
     FCommandLine: string;
     FComponents: TCOMAdminComponentList;
@@ -406,38 +401,48 @@ type
     FCRMEnabled: Boolean;
     FCRMLogFile: string;
     FDeleteable: Boolean;
+    FDescription: string;
+    FDirectory: string;
     FDumpEnabled: Boolean;
     FDumpOnException: Boolean;
     FDumpOnFailFast: Boolean;
     FDumpPath: string;
     FEventsEnabled: Boolean;
+    FGig3SupportEnabled: Boolean;
     FIdentity: string;
     FImpersonationLevel: TCOMAdminImpersonationLevel;
-    FIsSystem: Boolean;
+    FInstances: TComAdminInstanceList;
     FIsEnabled: Boolean;
+    FIsSystem: Boolean;
     FMaxDumpCount: Cardinal;
+    FPartitionID: string;
+    FProxy: Boolean;
+    FProxyServerName: string;
     FQCAuthenticateMsgs: TCOMAdminQCAuthenticateMsgs;
     FQCListenerMaxThreads: Cardinal;
     FQueueListenerEnabled: Boolean;
     FQueuingEnabled: Boolean;
-    FRecycleCallLimit: Cardinal;
     FRecycleActivationLimit: Cardinal;
-    FRecycleMemoryLimit: Cardinal;
+    FRecycleCallLimit: Cardinal;
     FRecycleExpirationTimeout: Cardinal;
     FRecycleLifetimeLimit: Cardinal;
-    FRunForever: Boolean;
+    FRecycleMemoryLimit: Cardinal;
     FReplicable: Boolean;
+    FRoles: TComAdminRoleList;
+    FRunForever: Boolean;
     FServiceName: string;
     FShutdownAfter: Cardinal;
-    FSRPEnabled: Boolean;
     FSoapActivated: Boolean;
-    FSRPTrustLevel: TCOMAdminSRPTrustLevel;
     FSoapBaseUrl: string;
-    FSoapVRoot: string;
     FSoapMailTo: string;
+    FSoapVRoot: string;
+    FSRPEnabled: Boolean;
+    FSRPTrustLevel: TCOMAdminSRPTrustLevel;
     function BuildInstallFileName: string;
     procedure GetComponents;
+    function GetInstances: TComAdminInstanceList;
     procedure GetRoles;
+    function GetUsersCollectionName: string;
     procedure ReadExtendedProperties;
     procedure SetAccessChecksEnabled(const Value: Boolean);
     procedure SetAccessChecksLevel(const Value: TCOMAdminAccessChecksLevelOptions);
@@ -491,14 +496,12 @@ type
   public
     constructor Create(ACollection: TComAdminBaseList; ACatalogObject: ICatalogObject); reintroduce;
     destructor Destroy; override;
-    function GetInstances: TComAdminInstanceList;
     function CopyProperties(ASourceApplication: TCOMAdminApplication; const APassword: string): Integer;
     function CopyToServer(ATargetServer: TComAdminCatalog; AOptions: Integer): Boolean;
-    function GetUsersCollectionName: string;
     function InstallComponent(const ALibraryName: string): TCOMAdminComponent;
     function IsIntegratedIdentity: Boolean;
     property Components: TCOMAdminComponentList read FComponents;
-    property Instances: TComAdminInstanceList read FInstances;
+    property Instances: TComAdminInstanceList read GetInstances;
     property Roles: TComAdminRoleList read FRoles write FRoles;
   published
     property AccessChecksEnabled: Boolean read FAccessChecksEnabled write SetAccessChecksEnabled default True;
@@ -613,11 +616,64 @@ type
     property TransactionTimeout: Cardinal read FTransactionTimeout write SetTransactionTimeout default DEFAULT_TRANSACTION_TIMEOUT;
   end;
 
+  TComAdminApplicationServer = class(TComAdminBaseObject);
+
+  TComAdminApplicationCluster = class(TComAdminBaseList);
+
+  TComAdminDCOMProtocol = class(TComAdminBaseObject)
+  strict private
+    FOrder: Cardinal;
+    FProtocolCode: TCOMAdminProtocol;
+    procedure ReadExtendedProperties;
+    procedure SetOrder(const Value: Cardinal);
+    procedure SetProtocolCode(const Value: TCOMAdminProtocol);
+  public
+    constructor Create(ACollection: TComAdminBaseList; ACatalogObject: ICatalogObject); reintroduce;
+  published
+    property Order: Cardinal read FOrder write SetOrder default 0;
+    property ProtocolCode: TCOMAdminProtocol read FProtocolCode write SetProtocolCode;
+  end;
+
+  TComAdminDCOMProtocolList = class(TComAdminBaseList)
+  strict private
+    function GetItem(Index: Integer): TComAdminDCOMProtocol;
+  public
+    property Items[Index: Integer]: TComAdminDCOMProtocol read GetItem; default;
+  end;
+
+  TComAdminEventClass = class(TComAdminBaseObject)
+  strict private
+    FBitness: TCOMAdminComponentType;
+    FApplication: string;
+    FProgID: string;
+    FDescription: string;
+    FCLSID: string;
+    FIsPrivateComponent: Boolean;
+    procedure ReadExtendedProperties;
+  public
+    constructor Create(ACollection: TComAdminBaseList; ACatalogObject: ICatalogObject); reintroduce;
+  published
+    property Application: string read FApplication;
+    property Bitness: TCOMAdminComponentType read FBitness;
+    property CLSID: string read FCLSID;
+    property Description: string read FDescription;
+    property IsPrivateComponent: Boolean read FIsPrivateComponent default False;
+    property ProgID: string read FProgID;
+  end;
+
+  TComAdminEventClassList = class(TComAdminBaseList)
+  strict private
+    function GetItem(Index: Integer): TComAdminEventClass;
+  public
+    property Items[Index: Integer]: TComAdminEventClass read GetItem; default;
+  end;
+
   // List class to hold passwords for different identities
   TPasswordList = TList<TPair<string,string>>;
 
   TComAdminCatalog = class(TObject)
   strict private
+    FApplicationCluster: TComAdminApplicationCluster;
     FApplications: TComAdminApplicationList;
     FCatalog: ICOMAdminCatalog2;
     FChangeCount: Integer;
@@ -625,15 +681,20 @@ type
     FCopiedLibraries: TList<string>;
     FCopyLibraries: Boolean;
     FDebug: Boolean;
+    FEventClasses: TComAdminEventClassList;
     FFilter: string;
     FLibraryPath: string;
     FOnDebug: TComAdminDebug;
     FOnReadObject: TComAdminReadEvent;
     FPasswords: TPasswordList;
     FPartitions: TComAdminPartitionList;
+    FProtocols: TComAdminDCOMProtocolList;
     FServer: string;
     procedure GetApplications;
+    procedure GetEventClasses;
     procedure GetPartitions;
+    procedure GetProtocols;
+    procedure GetServers;
     procedure SetFilter(const Value: string);
   public
     constructor Create(const AServer: string; const AFilter: string; AOnReadEvent: TComAdminReadEvent); reintroduce; overload;
@@ -646,13 +707,16 @@ type
     procedure ExportApplicationByName(const AName, AFilename: string);
     function GetPasswordForIdentity(const AIdentity: string): string;
     function SyncToServer(const ATargetServer, ACreatorString: string): Integer; overload;
+    property ApplicationCluster: TComAdminApplicationCluster read FApplicationCluster write FApplicationCluster;
     property Applications: TComAdminApplicationList read FApplications;
     property Catalog: ICOMAdminCatalog2 read FCatalog;
     property ChangeCount: Integer read FChangeCount write FChangeCount;
     property Computer: TComAdminComputer read FComputer write FComputer;
     property CopiedLibraries: TList<string> read FCopiedLibraries write FCopiedLibraries;
     property CopyLibraries: Boolean read FCopyLibraries write FCopyLibraries;
+    property DCOMProtocols: TComAdminDCOMProtocolList read FProtocols;
     property Debug: Boolean read FDebug write FDebug default False;
+    property EventClasses: TComAdminEventClassList read FEventClasses;
     property Filter: string read FFilter write SetFilter;
     property LibraryPath: string read FLibraryPath write FLibraryPath;
     property OnDebug: TComAdminDebug read FOnDebug write FOnDebug;
@@ -661,6 +725,7 @@ type
   end;
 
   EItemNotFoundException = Exception;
+  EUnknownProtocolException = Exception;
 
 implementation
 
@@ -1586,7 +1651,6 @@ begin
   FRoles := TComAdminRoleList.Create(Self, ACollection.Catalog, ACollection.CatalogCollection.GetCollection(COLLECTION_NAME_ROLES, Key) as ICatalogCollection);
   FComponents := TCOMAdminComponentList.Create(Self, ACollection.Catalog, ACollection.CatalogCollection.GetCollection(COLLECTION_NAME_COMPONENTS, Key) as ICatalogCollection);
 
-  GetInstances;
   GetRoles;
   GetComponents;
 end;
@@ -1639,17 +1703,14 @@ end;
 function TComAdminApplication.GetInstances: TComAdminInstanceList;
 var
   Collection: ICatalogCollection;
-  Instance: TComAdminInstance;
   i: Integer;
 begin
-  FInstances.Clear;
+  // As the instances collection must be really up to date, the getter reads it fresh from the catalog
   Collection := CatalogCollection.GetCollection(COLLECTION_NAME_INSTANCES, Key) as ICatalogCollection;
   Collection.Populate;
+  FInstances.Clear;
   for i := 0 to Collection.Count - 1 do
-  begin
-    Instance := TComAdminInstance.Create(FInstances, Collection.Item[i] as ICatalogObject);
-    FInstances.Add(Instance);
-  end;
+    FInstances.Add(TComAdminInstance.Create(FInstances, Collection.Item[i] as ICatalogObject));
   Result := FInstances;
 end;
 
@@ -2196,6 +2257,77 @@ begin
   end;
 end;
 
+{ TComAdminDCOMProtocol }
+
+constructor TComAdminDCOMProtocol.Create(ACollection: TComAdminBaseList; ACatalogObject: ICatalogObject);
+begin
+  inherited Create(ACollection, ACatalogObject);
+  ReadExtendedProperties;
+end;
+
+procedure TComAdminDCOMProtocol.ReadExtendedProperties;
+var
+  LProtocol: string;
+  i: Integer;
+begin
+  FOrder := VarAsType(CatalogObject.Value[PROPERTY_NAME_ORDER], varLongWord);
+  LProtocol := VarToStr(CatalogObject.Value[PROPERTY_NAME_PROTOCOL_CODE]);
+  if LProtocol.Equals(COM_ADMIN_PROTOCOLS[COMAdminProtocolTCP]) then
+    FProtocolCode := COMAdminProtocolTCP
+  else if LProtocol.Equals(COM_ADMIN_PROTOCOLS[COMAdminProtocolHTTP]) then
+    FProtocolCode := COMAdminProtocolHTTP
+  else if LProtocol.Equals(COM_ADMIN_PROTOCOLS[COMAdminProtocolSPX]) then
+    FProtocolCode := COMAdminProtocolSPX
+  else
+    raise EUnknownProtocolException.Create(ERROR_UNKNOWN_PROTOCOL);
+end;
+
+procedure TComAdminDCOMProtocol.SetOrder(const Value: Cardinal);
+begin
+  FOrder := Value;
+  if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_ORDER) then
+    CatalogObject.Value[PROPERTY_NAME_ORDER] := Value;
+end;
+
+procedure TComAdminDCOMProtocol.SetProtocolCode(const Value: TCOMAdminProtocol);
+begin
+  FProtocolCode := Value;
+  if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_PROTOCOL_CODE) then
+    CatalogObject.Value[PROPERTY_NAME_PROTOCOL_CODE] := COM_ADMIN_PROTOCOLS[Value];
+end;
+
+{ TComAdminDCOMProtocolList }
+
+function TComAdminDCOMProtocolList.GetItem(Index: Integer): TComAdminDCOMProtocol;
+begin
+  Result := inherited Items[Index] as TComAdminDCOMProtocol;
+end;
+
+{ TComAdminEventClass }
+
+constructor TComAdminEventClass.Create(ACollection: TComAdminBaseList; ACatalogObject: ICatalogObject);
+begin
+  inherited Create(ACollection, ACatalogObject);
+  ReadExtendedProperties;
+end;
+
+procedure TComAdminEventClass.ReadExtendedProperties;
+begin
+  FBitness := VarAsType(CatalogObject.Value[PROPERTY_NAME_BITNESS], varLongWord);
+  FApplication := VarToStr(CatalogObject.Value[PROPERTY_NAME_APPLICATION]);
+  FProgID := VarToStr(CatalogObject.Value[PROPERTY_NAME_PROG_ID]);
+  FDescription := VarToStr(CatalogObject.Value[PROPERTY_NAME_DESCRIPTION]);
+  FCLSID := VarToStr(CatalogObject.Value[PROPERTY_NAME_CLSID]);
+  FIsPrivateComponent := VarAsType(CatalogObject.Value[PROPERTY_NAME_IS_PRIVATE_COMPONENT], varBoolean);
+end;
+
+{ TComAdminEventClassList }
+
+function TComAdminEventClassList.GetItem(Index: Integer): TComAdminEventClass;
+begin
+  Result := inherited Items[Index] as TComAdminEventClass;
+end;
+
 { TComAdminCatalog }
 
 constructor TComAdminCatalog.Create(const AServer, AFilter: string; AOnReadEvent: TComAdminReadEvent);
@@ -2217,13 +2349,33 @@ begin
   else
     FFilter := AFilter;
 
+  FApplicationCluster := TComAdminApplicationCluster.Create(nil, Self, FCatalog.GetCollection(COLLECTION_NAME_APPLICATION_CLUSTER) as ICatalogCollection);
   FApplications := TComAdminApplicationList.Create(nil, Self, FCatalog.GetCollection(COLLECTION_NAME_APPS) as ICatalogCollection);
+  FEventClasses := TComAdminEventClassList.Create(nil, Self, FCatalog.GetCollection(COLLECTION_NAME_EVENT_CLASSES) as ICatalogCollection);
   FPartitions := TComAdminPartitionList.Create(nil, Self, FCatalog.GetCollection(COLLECTION_NAME_PARTITIONS) as ICatalogCollection);
+  FProtocols := TComAdminDCOMProtocolList.Create(nil, Self, FCatalog.GetCollection(COLLECTION_NAME_DCOM_PROTOCOLS) as ICatalogCollection);
   FComputer := TComAdminComputer.Create(FCatalog.GetCollection(COLLECTION_NAME_COMPUTER) as ICatalogCollection);
 
   GetApplications;
+  GetEventClasses;
   GetPartitions;
+  GetProtocols;
+  GetServers;
 
+end;
+
+destructor TComAdminCatalog.Destroy;
+begin
+  FPasswords.Clear;
+  FPasswords.Free;
+  FCopiedLibraries.Free;
+  FApplications.Free;
+  FComputer.Free;
+  FEventClasses.Free;
+  FPartitions.Free;
+  FProtocols.Free;
+  FApplicationCluster.Free;
+  inherited;
 end;
 
 procedure TComAdminCatalog.DebugMessage(const AMessage: string);
@@ -2235,17 +2387,6 @@ end;
 procedure TComAdminCatalog.DebugMessage(const AMessage: string; AParams: array of const);
 begin
   DebugMessage(Format(AMessage, AParams));
-end;
-
-destructor TComAdminCatalog.Destroy;
-begin
-  FPasswords.Clear;
-  FPasswords.Free;
-  FCopiedLibraries.Free;
-  FApplications.Free;
-  FComputer.Free;
-  FPartitions.Free;
-  inherited;
 end;
 
 procedure TComAdminCatalog.AddPasswordForIdentity(const AIdentity, APassword: string);
@@ -2290,14 +2431,20 @@ begin
   end;
 end;
 
+procedure TComAdminCatalog.GetEventClasses;
+var
+  i: Integer;
+begin
+  for i := 0 to FEventClasses.CatalogCollection.Count - 1 do
+    FEventClasses.Add(TComAdminEventClass.Create(FEventClasses, FEventClasses.CatalogCollection.Item[i] as ICatalogObject));
+end;
+
 procedure TComAdminCatalog.GetPartitions;
 var
   i: Integer;
 begin
   for i := 0 to FPartitions.CatalogCollection.Count - 1 do
-  begin
     FPartitions.Add(TComAdminPartition.Create(FPartitions, FPartitions.CatalogCollection.Item[i] as ICatalogObject));
-  end;
 end;
 
 function TComAdminCatalog.GetPasswordForIdentity(const AIdentity: string): string;
@@ -2308,6 +2455,22 @@ begin
     if FPasswords[i].Key.Equals(AIdentity.ToLower) then
       Exit(FPasswords[i].Value);
   raise EItemNotFoundException.CreateFmt(ERROR_NOT_FOUND, [AIdentity]);
+end;
+
+procedure TComAdminCatalog.GetProtocols;
+var
+  i: Integer;
+begin
+  for i := 0 to FProtocols.CatalogCollection.Count - 1 do
+    FProtocols.Add(TComAdminDCOMProtocol.Create(FProtocols, FProtocols.CatalogCollection.Item[i] as ICatalogObject));
+end;
+
+procedure TComAdminCatalog.GetServers;
+var
+  i: Integer;
+begin
+  for i := 0 to FApplicationCluster.CatalogCollection.Count - 1 do
+    FApplicationCluster.Add(TComAdminApplicationServer.Create(FApplicationCluster, FApplicationCluster.CatalogCollection.Item[i] as ICatalogObject));
 end;
 
 procedure TComAdminCatalog.SetFilter(const Value: string);

@@ -20,15 +20,19 @@ const
   ERROR_INVALID_LIBRARY_PATH = 'Invalid library path for server %s';
   ERROR_NOT_FOUND = 'Element %s could not be found in this collection';
   ERROR_OUT_OF_RANGE = 'Value of range';
+  ERROR_UNKNOWN_PROTOCOL = 'Unknown DCOM protocol';
 
   // ==================================================================================
   // Constants used for the objects, collections and properties in ComAdminLibrary
   // DO NOT LOCALIZE !!!
   // ==================================================================================
+  COLLECTION_NAME_APPLICATION_CLUSTER = 'ApplicationCluster';
   COLLECTION_NAME_APPS = 'Applications';
   COLLECTION_NAME_COMPONENTS = 'Components';
   COLLECTION_NAME_COMPONENT_ROLES = 'RolesForComponent';
   COLLECTION_NAME_COMPUTER = 'LocalComputer';
+  COLLECTION_NAME_DCOM_PROTOCOLS = 'DCOMProtocols';
+  COLLECTION_NAME_EVENT_CLASSES = 'EventClassesForIID';
   COLLECTION_NAME_INSTANCES = 'ApplicationInstances';
   COLLECTION_NAME_INTERFACES = 'InterfacesForComponent';
   COLLECTION_NAME_INTERFACE_ROLES = 'RolesForInterface';
@@ -50,6 +54,7 @@ const
   PROPERTY_NAME_ACCESS_CHECKS = 'ApplicationAccessChecksEnabled';
   PROPERTY_NAME_ACTIVATION = 'Activation';
   PROPERTY_NAME_ALLOW_SUBSCRIBERS = 'AllowInprocSubscribers';
+  PROPERTY_NAME_APPLICATION = 'Application';
   PROPERTY_NAME_APPLICATION_DIRECTORY = 'ApplicationDirectory';
   PROPERTY_NAME_APPLICATION_ID = 'ApplicationID';
   PROPERTY_NAME_APPLICATION_PROXY = 'ApplicationProxy';
@@ -113,6 +118,7 @@ const
   PROPERTY_NAME_MUST_RUN_DEFAULT_CONTEXT = 'MustRunInDefaultContext';
   PROPERTY_NAME_NAME = 'Name';
   PROPERTY_NAME_OBJECT_POOLING = 'ObjectPoolingEnabled';
+  PROPERTY_NAME_ORDER = 'Order';
   PROPERTY_NAME_OPERATING_SYSTEM = 'OperatingSystem';
   PROPERTY_NAME_PARTITION_ID = 'AppPartitionID';
   PROPERTY_NAME_PARTITION_LOOKUP = 'LocalPartitionLookupEnabled';
@@ -122,6 +128,7 @@ const
   PROPERTY_NAME_PORTS = 'Ports';
   PROPERTY_NAME_PROCESSID = 'ProcessID';
   PROPERTY_NAME_PROG_ID = 'ProgID';
+  PROPERTY_NAME_PROTOCOL_CODE = 'ProtocolCode';
   PROPERTY_NAME_PROXY_RSN = 'ApplicationProxyRSN';
   PROPERTY_NAME_PROXY_SERVER_NAME = 'ApplicationProxyServerName';
   PROPERTY_NAME_QC_AUTHENTICATE = 'QCAuthenticateMsgs';
