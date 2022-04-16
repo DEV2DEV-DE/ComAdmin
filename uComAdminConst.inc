@@ -20,6 +20,7 @@ const
   ERROR_INVALID_LIBRARY_PATH = 'Invalid library path for server %s';
   ERROR_NOT_FOUND = 'Element %s could not be found in this collection';
   ERROR_OUT_OF_RANGE = 'Value of range';
+  ERROR_SAVE_CHANGES = 'Error in %s.TComAdminBaseList.SaveChanges: ';
   ERROR_UNKNOWN_PROTOCOL = 'Unknown DCOM protocol';
 
   // ==================================================================================
@@ -32,6 +33,7 @@ const
   COLLECTION_NAME_COMPONENTS = 'Components';
   COLLECTION_NAME_COMPUTER = 'LocalComputer';
   COLLECTION_NAME_DCOM_PROTOCOLS = 'DCOMProtocols';
+  COLLECTION_NAME_ERROR_INFO = 'ErrorInfo';
   COLLECTION_NAME_EVENT_CLASSES = 'EventClassesForIID';
   COLLECTION_NAME_INSTANCES = 'ApplicationInstances';
   COLLECTION_NAME_INTERFACE_ROLES = 'RolesForInterface';
@@ -90,6 +92,7 @@ const
   PROPERTY_NAME_DUMP_FAILFAST = 'DumpOnFailfast';
   PROPERTY_NAME_DUMP_PATH = 'DumpPath';
   PROPERTY_NAME_ENABLED = 'IsEnabled';
+  PROPERTY_NAME_ERROR_CODE = 'ErrorCode';
   PROPERTY_NAME_EVENT_TRACKING = 'EventTrackingEnabled';
   PROPERTY_NAME_EVENTS_ENABLED = 'EventsEnabled';
   PROPERTY_NAME_EXCEPTION_CLASS = 'ExceptionClass';
@@ -110,6 +113,8 @@ const
   PROPERTY_NAME_KEY = 'Key';
   PROPERTY_NAME_LOAD_BALANCING = 'LoadBalancingSupported';
   PROPERTY_NAME_LOAD_BALANCING_ID = 'LoadBalancingCLSID';
+  PROPERTY_NAME_MAJOR_REF = 'MajorRef';
+  PROPERTY_NAME_MINOR_REF = 'MinorRef';
   PROPERTY_NAME_MAX_DUMPS = 'MaxDumpCount';
   PROPERTY_NAME_MAX_POOL_SIZE = 'MaxPoolSize';
   PROPERTY_NAME_MI_FILTER_CLSID = 'MultiInterfacePublisherFilterCLSID';

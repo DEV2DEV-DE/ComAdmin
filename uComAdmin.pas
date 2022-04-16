@@ -106,6 +106,7 @@ type
     constructor Create(AOwner: TComAdminBaseObject; ACatalog: TComAdminCatalog; ACatalogCollection: ICatalogCollection); reintroduce;
     function Contains(const AItemName: string): Boolean;
     function Delete(Index: Integer): Integer;
+    procedure RaiseExtendedError(AException: Exception; ACollection: ICatalogCollection);
     function SaveChanges: Integer;
     property Catalog: TComAdminCatalog read FCatalog write FCatalog;
     property CatalogCollection: ICatalogCollection read FCatalogCollection write FCatalogCollection;
@@ -724,6 +725,11 @@ type
     property Server: string read FServer;
   end;
 
+  EExtendedComAdminException = class(Exception)
+  public
+    constructor Create(const ErrorCode, MajorRef, MinorRef, Name: string);
+  end;
+
   EItemNotFoundException = Exception;
   EUnknownProtocolException = Exception;
 
@@ -735,6 +741,13 @@ uses
   Winapi.Windows, System.Rtti, System.TypInfo, System.IOUtils;
 
 {$I uComAdminConst.inc}
+
+{ EExtendedComAdminException }
+
+constructor EExtendedComAdminException.Create(const ErrorCode, MajorRef, MinorRef, Name: string);
+begin
+  raise Exception.CreateFmt('ErrorCode: %s - MajorRef: %s - MinorRef: %s - Name: %s', [ErrorCode, MajorRef, MinorRef, Name]);
+end;
 
 { TComAdminBaseObject }
 
@@ -791,16 +804,6 @@ end;
 
 { TComAdminBaseList }
 
-function TComAdminBaseList.Contains(const AItemName: string): Boolean;
-var
-  i: Integer;
-begin
-  Result := False;
-  for i := 0 to Count - 1 do
-    if Items[i].Name.Equals(AItemName) then
-      Exit(True);
-end;
-
 constructor TComAdminBaseList.Create(AOwner: TComAdminBaseObject; ACatalog: TComAdminCatalog; ACatalogCollection: ICatalogCollection);
 begin
   inherited Create(True);
@@ -810,8 +813,23 @@ begin
     FCatalog := ACatalog;
     FCatalogCollection := ACatalogCollection;
     FName := FCatalogCollection.Name;
-    FCatalogCollection.Populate;
+    try
+      FCatalogCollection.Populate;
+    except
+      on E:Exception do
+        RaiseExtendedError(E, ACatalogCollection);
+    end;
   end;
+end;
+
+function TComAdminBaseList.Contains(const AItemName: string): Boolean;
+var
+  i: Integer;
+begin
+  Result := False;
+  for i := 0 to Count - 1 do
+    if Items[i].Name.Equals(AItemName) then
+      Exit(True);
 end;
 
 function TComAdminBaseList.Delete(Index: Integer): Integer;
@@ -833,6 +851,24 @@ begin
   end;
 end;
 
+procedure TComAdminBaseList.RaiseExtendedError(AException: Exception; ACollection: ICatalogCollection);
+var
+  LErrorInfos: ICatalogCollection;
+  LErrorInfo: ICatalogObject;
+begin
+  LErrorInfos := ACollection.GetCollection(COLLECTION_NAME_ERROR_INFO, '') as ICatalogCollection;
+  LErrorInfos.Populate;
+  if LErrorInfos.Count > 0 then
+  begin
+    LErrorInfo := LErrorInfos.Item[0] as ICatalogObject;
+    raise EExtendedComAdminException.Create(VarToStr(LErrorInfo.Value[PROPERTY_NAME_ERROR_CODE]),
+                                            VarToStr(LErrorInfo.Value[PROPERTY_NAME_MAJOR_REF]),
+                                            VarToStr(LErrorInfo.Value[PROPERTY_NAME_MINOR_REF]),
+                                            VarToStr(LErrorInfo.Value[PROPERTY_NAME_NAME]));
+  end else
+    raise Exception.Create(AException.Message);
+end;
+
 function TComAdminBaseList.SaveChanges: Integer;
 begin
   Result := 0;
@@ -841,7 +877,7 @@ begin
       Result := FCatalogCollection.SaveChanges;
   except
     on E:Exception do
-      FCatalog.DebugMessage('Error in %s.TComAdminBaseList.SaveChanges: ', [Self.Name, E.Message]);
+      RaiseExtendedError(E, FCatalogCollection);
   end;
 end;
 
@@ -1207,7 +1243,7 @@ begin
   inherited CopyProperties(ASourceComponent, Self);
 
   // Changes must be saved before any sub-collections can be updated
-  Result := CatalogCollection.SaveChanges;
+  Result := Collection.SaveChanges;
 
   // Synchronize roles from source component
   SyncRoles(ASourceComponent);
@@ -1603,7 +1639,7 @@ begin
   Password := APassword;
 
   // Changes must be saved before any sub-collections can be updated
-  Result := CatalogCollection.SaveChanges;
+  Result := Collection.SaveChanges;
 
   // Synchronize roles from source application
   SyncRoles(ASourceApplication);
@@ -1686,10 +1722,18 @@ end;
 
 function TComAdminApplication.InstallComponent(const ALibraryName: string): TCOMAdminComponent;
 begin
-  Collection.Catalog.Catalog.InstallComponent(Name, ALibraryName, '', '');
-  FComponents.CatalogCollection.Populate; // muste be populated to retrieve the newly installed component
-  FComponents.Add(TCOMAdminComponent.Create(FComponents, (FComponents.CatalogCollection.Item[FComponents.CatalogCollection.Count - 1]) as ICatalogObject));
-  Result := FComponents.Items[FComponents.Count - 1] as TCOMAdminComponent;
+  try
+    Collection.Catalog.Catalog.InstallComponent(Name, ALibraryName, '', '');
+    FComponents.CatalogCollection.Populate; // muste be populated to retrieve the newly installed component
+    FComponents.Add(TCOMAdminComponent.Create(FComponents, (FComponents.CatalogCollection.Item[FComponents.CatalogCollection.Count - 1]) as ICatalogObject));
+    Result := FComponents.Items[FComponents.Count - 1] as TCOMAdminComponent;
+  except
+    on E:Exception do
+    begin
+      Result := nil;
+      Collection.RaiseExtendedError(E, Collection.CatalogCollection);
+    end;
+  end;
 end;
 
 function TComAdminApplication.IsIntegratedIdentity: Boolean;
@@ -2268,7 +2312,6 @@ end;
 procedure TComAdminDCOMProtocol.ReadExtendedProperties;
 var
   LProtocol: string;
-  i: Integer;
 begin
   FOrder := VarAsType(CatalogObject.Value[PROPERTY_NAME_ORDER], varLongWord);
   LProtocol := VarToStr(CatalogObject.Value[PROPERTY_NAME_PROTOCOL_CODE]);
@@ -2396,7 +2439,12 @@ end;
 
 procedure TComAdminCatalog.ExportApplication(AIndex: Integer; const AFilename: string);
 begin
-  FCatalog.ExportApplication(FApplications.Items[AIndex].Key, AFilename, COMAdminExportUsers and COMAdminExportForceOverwriteOfFiles);
+  try
+    FCatalog.ExportApplication(FApplications.Items[AIndex].Key, AFilename, COMAdminExportUsers and COMAdminExportForceOverwriteOfFiles);
+  except
+    on E:Exception do
+      FApplications.RaiseExtendedError(E, FApplications.CatalogCollection);
+  end;
 end;
 
 procedure TComAdminCatalog.ExportApplicationByKey(const AKey, AFilename: string);
