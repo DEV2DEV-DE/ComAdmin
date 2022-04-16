@@ -1,4 +1,12 @@
 const
+  CATALOG_READ_APPLICATIONS: Boolean = True;
+  CATALOG_READ_APPLICATION_CLUSTERS: Boolean = True;
+  CATALOG_READ_EVENT_CLASSES: Boolean = True;
+  CATALOG_READ_INPROC_SERVERS: Boolean = False;
+  CATALOG_READ_PARTITIONS: Boolean = True;
+  CATALOG_READ_PROTOCOLS: Boolean = True;
+  CATALOG_READ_TRANSIENT_SUBSCRIPTIONS: Boolean = True;
+
   DEBUG_MESSAGE_ADD_ROLE_ERROR = '[COMAdmin] Could not append role ''%s'' to object ''%s''';
   DEBUG_MESSAGE_COPY_ERROR = '[COMAdmin] Copy library %s failed: %s';
   DEBUG_MESSAGE_COPY_LIBRARY = '[COMAdmin] Copy library %s';
@@ -17,6 +25,7 @@ const
 
   ERROR_APPLICATION_NOT_DOWN = 'Application could not be shut down';
   ERROR_COPY_LIBRARY = 'Library could not be copied to target server';
+  ERROR_EXTENDED_MESSAGE = 'ErrorCode: %s - MajorRef: %s - MinorRef: %s - Name: %s';
   ERROR_INVALID_LIBRARY_PATH = 'Invalid library path for server %s';
   ERROR_NOT_FOUND = 'Element %s could not be found in this collection';
   ERROR_OUT_OF_RANGE = 'Value of range';

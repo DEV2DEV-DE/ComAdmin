@@ -799,6 +799,7 @@ type
     procedure GetProtocols;
     procedure GetServers;
     procedure GetTransientSubscription;
+    function GetLocalComputerName: string;
     function ReadAvailableCollections: TList<string>;
     procedure SetFilter(const Value: string);
   public
@@ -850,7 +851,7 @@ uses
 
 constructor EExtendedComAdminException.Create(const ErrorCode, MajorRef, MinorRef, Name: string);
 begin
-  raise Exception.CreateFmt('ErrorCode: %s - MajorRef: %s - MinorRef: %s - Name: %s', [ErrorCode, MajorRef, MinorRef, Name]);
+  raise Exception.CreateFmt(ERROR_EXTENDED_MESSAGE, [ErrorCode, MajorRef, MinorRef, Name]);
 end;
 
 { TComAdminBaseObject }
@@ -2685,7 +2686,8 @@ begin
 
   FOnReadObject := AOnReadEvent;
 
-  if not AServer.IsEmpty then
+  // Only call connect if the given server is not the local computer
+  if not AServer.IsEmpty and not AServer.ToLower.Equals(GetLocalComputerName.ToLower) then
     FCatalog.Connect(AServer);
 
   if AFilter.IsEmpty then
@@ -2704,13 +2706,13 @@ begin
   FProtocols := TComAdminDCOMProtocolList.Create(nil, Self, FCatalog.GetCollection(COLLECTION_NAME_DCOM_PROTOCOLS) as ICatalogCollection);
   FTransientSubscriptions := TComAdminTransientSubscriptionList.Create(nil, Self, FCatalog.GetCollection(COLLECTION_NAME_TRANSIENT_SUBSCRIPTION) as ICatalogCollection);
 
-  GetApplications;
-  GetEventClasses;
-  if False then GetInprocServers;
-  GetPartitions;
-  GetProtocols;
-  GetServers;
-  GetTransientSubscription;
+  if CATALOG_READ_APPLICATIONS then GetApplications;
+  if CATALOG_READ_EVENT_CLASSES then GetEventClasses;
+  if CATALOG_READ_INPROC_SERVERS then GetInprocServers;
+  if CATALOG_READ_PARTITIONS then GetPartitions;
+  if CATALOG_READ_PROTOCOLS then GetProtocols;
+  if CATALOG_READ_APPLICATION_CLUSTERS then GetServers;
+  if CATALOG_READ_TRANSIENT_SUBSCRIPTIONS then GetTransientSubscription;
 
 end;
 
@@ -2846,6 +2848,19 @@ var
 begin
   for i := 0 to FTransientSubscriptions.CatalogCollection.Count - 1 do
     FTransientSubscriptions.Add(TComAdminTransientSubscription.Create(FTransientSubscriptions, FTransientSubscriptions.CatalogCollection.Item[i] as ICatalogObject));
+end;
+
+function TComAdminCatalog.GetLocalComputerName: string;
+var
+  BufferSize: Cardinal;
+  Buffer: array [0..MAX_PATH] of Char;
+begin
+  BufferSize := MAX_PATH;
+  GetComputerName(Buffer, BufferSize);
+  if BufferSize > 0 then
+    Result := Buffer
+  else
+    Result := '';
 end;
 
 function TComAdminCatalog.ReadAvailableCollections: TList<string>;
