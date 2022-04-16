@@ -38,6 +38,8 @@ https://docs.microsoft.com/en-us/windows/win32/cossdk/com--administration-collec
         ● Role
           ∞ Users (+/-) 
             ● User
+  ∞ ApplicationCluster (+/-)
+    ● Server
   ∞ Protocols (+/-)
     ● Protocol
   ∞ EventClasses (+/-)
