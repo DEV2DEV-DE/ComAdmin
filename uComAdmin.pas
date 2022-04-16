@@ -669,6 +669,81 @@ type
     property Items[Index: Integer]: TComAdminEventClass read GetItem; default;
   end;
 
+  TComAdminInprocServer = class(TComAdminBaseObject)
+  strict private
+    FCLSID: string;
+    FInprocServer32: string;
+    FProgID: string;
+    procedure ReadExtendedProperties;
+  public
+    constructor Create(ACollection: TComAdminBaseList; ACatalogObject: ICatalogObject); reintroduce;
+  published
+    property CLSID: string read FCLSID;
+    property InprocServer32: string read FInprocServer32;
+    property ProdID: string read FProgID;
+  end;
+
+  TComAdminInprocServerList = class(TComAdminBaseList)
+  strict private
+    function GetItem(Index: Integer): TComAdminInprocServer;
+  public
+    property Items[Index: Integer]: TComAdminInprocServer read GetItem; default;
+  end;
+
+  TComAdminTransientSubscription = class(TComAdminBaseObject)
+  strict private
+    FDescription: string;
+    FInterfaceID: string;
+    FEnabled: Boolean;
+    FFilterCriteria: string;
+    FMethodName: string;
+    FEventCLSID: string;
+    FEventClassPartitionID: string;
+    FID: string;
+    FSubscriberPartitionID: string;
+    FPublisherID: string;
+    FSubscriberInterface: Variant;
+    FPerUser: Boolean;
+    FUserName: string;
+    procedure ReadExtendedProperties;
+    procedure SetDescription(const Value: string);
+    procedure SetEnabled(const Value: Boolean);
+    procedure SetEventClassPartitionID(const Value: string);
+    procedure SetEventCLSID(const Value: string);
+    procedure SetFilterCriteria(const Value: string);
+    procedure SetID(const Value: string);
+    procedure SetInterfaceID(const Value: string);
+    procedure SetMethodName(const Value: string);
+    procedure SetPerUser(const Value: Boolean);
+    procedure SetPublisherID(const Value: string);
+    procedure SetSubscriberInterface(const Value: Variant);
+    procedure SetSubscriberPartitionID(const Value: string);
+    procedure SetUserName(const Value: string);
+  public
+    constructor Create(ACollection: TComAdminBaseList; ACatalogObject: ICatalogObject); reintroduce;
+  published
+    property Description: string read FDescription write SetDescription;
+    property Enabled: Boolean read FEnabled write SetEnabled;
+    property EventClassPartitionID: string read FEventClassPartitionID write SetEventClassPartitionID;
+    property EventCLSID: string read FEventCLSID write SetEventCLSID;
+    property FilterCriteria: string read FFilterCriteria write SetFilterCriteria;
+    property ID: string read FID write SetID;
+    property InterfaceID: string read FInterfaceID write SetInterfaceID;
+    property MethodName_: string read FMethodName write SetMethodName;
+    property PerUser: Boolean read FPerUser write SetPerUser;
+    property PublisherID: string read FPublisherID write SetPublisherID;
+    property SubscriberInterface: Variant read FSubscriberInterface write SetSubscriberInterface;
+    property SubscriberPartitionID: string read FSubscriberPartitionID write SetSubscriberPartitionID;
+    property UserName: string read FUserName write SetUserName;
+  end;
+
+  TComAdminTransientSubscriptionList = class(TComAdminBaseList)
+  strict private
+    function GetItem(Index: Integer): TComAdminTransientSubscription;
+  public
+    property Items[Index: Integer]: TComAdminTransientSubscription read GetItem; default;
+  end;
+
   // List class to hold passwords for different identities
   TPasswordList = TList<TPair<string,string>>;
 
@@ -676,6 +751,7 @@ type
   strict private
     FApplicationCluster: TComAdminApplicationCluster;
     FApplications: TComAdminApplicationList;
+    FAvailableCollections: TList<string>;
     FCatalog: ICOMAdminCatalog2;
     FChangeCount: Integer;
     FComputer: TComAdminComputer;
@@ -684,6 +760,7 @@ type
     FDebug: Boolean;
     FEventClasses: TComAdminEventClassList;
     FFilter: string;
+    FInprocServers: TComAdminInprocServerList;
     FLibraryPath: string;
     FOnDebug: TComAdminDebug;
     FOnReadObject: TComAdminReadEvent;
@@ -691,11 +768,15 @@ type
     FPartitions: TComAdminPartitionList;
     FProtocols: TComAdminDCOMProtocolList;
     FServer: string;
+    FTransientSubscriptions: TComAdminTransientSubscriptionList;
     procedure GetApplications;
     procedure GetEventClasses;
+    procedure GetInprocServers;
     procedure GetPartitions;
     procedure GetProtocols;
     procedure GetServers;
+    procedure GetTransientSubscription;
+    function ReadAvailableCollections: TList<string>;
     procedure SetFilter(const Value: string);
   public
     constructor Create(const AServer: string; const AFilter: string; AOnReadEvent: TComAdminReadEvent); reintroduce; overload;
@@ -1301,7 +1382,7 @@ begin
   FFireInParallel := VarAsType(CatalogObject.Value[PROPERTY_NAME_FIRE_IN_PARALLEL], varBoolean);
   FIISIntrinsics := VarAsType(CatalogObject.Value[PROPERTY_NAME_IIS_INTRINSICS], varBoolean);
 //  FInitializeServerApplication := VarAsType(CatalogObject.Value[PROPERTY_NAME_INIT_SERVER_APPLICATION], varBoolean);
-  FIsEnabled := VarAsType(CatalogObject.Value[PROPERTY_NAME_ENABLED], varBoolean);
+  FIsEnabled := VarAsType(CatalogObject.Value[PROPERTY_NAME_IS_ENABLED], varBoolean);
   FIsEventClass := VarAsType(CatalogObject.Value[PROPERTY_NAME_IS_EVENT_CLASS], varBoolean);
   FIsInstalled := VarAsType(CatalogObject.Value[PROPERTY_NAME_IS_INSTALLED], varBoolean);
   FIsPrivateComponent := VarAsType(CatalogObject.Value[PROPERTY_NAME_IS_PRIVATE_COMPONENT], varBoolean);
@@ -1439,8 +1520,8 @@ end;
 procedure TCOMAdminComponent.SetIsEnabled(const Value: Boolean);
 begin
   FIsEnabled := Value;
-  if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_ENABLED) then
-    CatalogObject.Value[PROPERTY_NAME_ENABLED] := Value;
+  if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_IS_ENABLED) then
+    CatalogObject.Value[PROPERTY_NAME_IS_ENABLED] := Value;
 end;
 
 procedure TCOMAdminComponent.SetIsEventClass(const Value: Boolean);
@@ -1785,7 +1866,7 @@ begin
   FEventsEnabled := VarAsType(CatalogObject.Value[PROPERTY_NAME_EVENTS_ENABLED], varBoolean);
   FIdentity := VarToStr(CatalogObject.Value[PROPERTY_NAME_IDENTITY]);
   FImpersonationLevel := VarAsType(CatalogObject.Value[PROPERTY_NAME_IMPERSONATION], varLongWord);
-  FIsEnabled := VarAsType(CatalogObject.Value[PROPERTY_NAME_ENABLED], varBoolean);
+  FIsEnabled := VarAsType(CatalogObject.Value[PROPERTY_NAME_IS_ENABLED], varBoolean);
   FIsSystem := VarAsType(CatalogObject.Value[PROPERTY_NAME_SYSTEM], varBoolean);
   FMaxDumpCount := VarAsType(CatalogObject.Value[PROPERTY_NAME_MAX_DUMPS], varLongWord);
   FQCAuthenticateMsgs := VarAsType(CatalogObject.Value[PROPERTY_NAME_QC_AUTHENTICATE], varLongWord);
@@ -1969,8 +2050,8 @@ end;
 procedure TComAdminApplication.SetIsEnabled(const Value: Boolean);
 begin
   FIsEnabled := Value;
-  if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_ENABLED) then
-    CatalogObject.Value[PROPERTY_NAME_ENABLED] := Value;
+  if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_IS_ENABLED) then
+    CatalogObject.Value[PROPERTY_NAME_IS_ENABLED] := Value;
 end;
 
 procedure TComAdminApplication.SetMaxDumpCount(const Value: Cardinal);
@@ -2371,6 +2452,151 @@ begin
   Result := inherited Items[Index] as TComAdminEventClass;
 end;
 
+{ TComAdminInprocServer }
+
+constructor TComAdminInprocServer.Create(ACollection: TComAdminBaseList; ACatalogObject: ICatalogObject);
+begin
+  inherited Create(ACollection, ACatalogObject);
+  ReadExtendedProperties;
+end;
+
+procedure TComAdminInprocServer.ReadExtendedProperties;
+begin
+  FCLSID := VarToStr(CatalogObject.Value[PROPERTY_NAME_CLSID]);
+  FInprocServer32 := VarToStr(CatalogObject.Value[PROPERTY_NAME_INPROC_SERVER32]);
+  FProgID := VarToStr(CatalogObject.Value[PROPERTY_NAME_PROG_ID]);
+end;
+
+{ TComAdminInprocServerList }
+
+function TComAdminInprocServerList.GetItem(Index: Integer): TComAdminInprocServer;
+begin
+  Result := inherited Items[Index] as TComAdminInprocServer;
+end;
+
+{ TComAdminTransientSubscription }
+
+constructor TComAdminTransientSubscription.Create(ACollection: TComAdminBaseList; ACatalogObject: ICatalogObject);
+begin
+  inherited Create(ACollection, ACatalogObject);
+  ReadExtendedProperties;
+end;
+
+procedure TComAdminTransientSubscription.ReadExtendedProperties;
+begin
+  FDescription := VarToStr(CatalogObject.Value[PROPERTY_NAME_DESCRIPTION]);
+  FInterfaceID := VarToStr(CatalogObject.Value[PROPERTY_NAME_INTERFACE_ID]);
+  FEnabled := VarAsType(CatalogObject.Value[PROPERTY_NAME_ENABLED], varBoolean);
+  FFilterCriteria := VarToStr(CatalogObject.Value[PROPERTY_NAME_FILTER_CRITERIA]);
+  FMethodName := VarToStr(CatalogObject.Value[PROPERTY_NAME_METHOD_NAME]);
+  FEventCLSID := VarToStr(CatalogObject.Value[PROPERTY_NAME_EVENT_CLSID]);
+  FEventClassPartitionID := VarToStr(CatalogObject.Value[PROPERTY_NAME_EVENT_CLASS_PARTITION]);
+  FID := VarToStr(CatalogObject.Value[PROPERTY_NAME_ID]);
+  FSubscriberPartitionID := VarToStr(CatalogObject.Value[PROPERTY_NAME_SUBSCRIBER_PARTITION_ID]);
+  FPublisherID := VarToStr(CatalogObject.Value[PROPERTY_NAME_PUBLISHER_ID]);
+  FSubscriberInterface := CatalogObject.Value[PROPERTY_NAME_SUBSCRIBER_INTERFACE];
+  FPerUser := VarAsType(CatalogObject.Value[PROPERTY_NAME_PER_USER], varBoolean);
+  FUserName := VarToStr(CatalogObject.Value[PROPERTY_NAME_USER_NAME]);
+end;
+
+procedure TComAdminTransientSubscription.SetDescription(const Value: string);
+begin
+  FDescription := Value;
+  if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_DESCRIPTION) then
+    CatalogObject.Value[PROPERTY_NAME_DESCRIPTION] := Value;
+end;
+
+procedure TComAdminTransientSubscription.SetEnabled(const Value: Boolean);
+begin
+  FEnabled := Value;
+  if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_ENABLED) then
+    CatalogObject.Value[PROPERTY_NAME_ENABLED] := Value;
+end;
+
+procedure TComAdminTransientSubscription.SetEventClassPartitionID(const Value: string);
+begin
+  FEventClassPartitionID := Value;
+  if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_EVENT_CLASS_PARTITION) then
+    CatalogObject.Value[PROPERTY_NAME_EVENT_CLASS_PARTITION] := Value;
+end;
+
+procedure TComAdminTransientSubscription.SetEventCLSID(const Value: string);
+begin
+  FEventCLSID := Value;
+  if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_EVENT_CLSID) then
+    CatalogObject.Value[PROPERTY_NAME_EVENT_CLSID] := Value;
+end;
+
+procedure TComAdminTransientSubscription.SetFilterCriteria(const Value: string);
+begin
+  FFilterCriteria := Value;
+  if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_FILTER_CRITERIA) then
+    CatalogObject.Value[PROPERTY_NAME_FILTER_CRITERIA] := Value;
+end;
+
+procedure TComAdminTransientSubscription.SetID(const Value: string);
+begin
+  FID := Value;
+  if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_ID) then
+    CatalogObject.Value[PROPERTY_NAME_ID] := Value;
+end;
+
+procedure TComAdminTransientSubscription.SetInterfaceID(const Value: string);
+begin
+  FInterfaceID := Value;
+  if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_INTERFACE_ID) then
+    CatalogObject.Value[PROPERTY_NAME_INTERFACE_ID] := Value;
+end;
+
+procedure TComAdminTransientSubscription.SetMethodName(const Value: string);
+begin
+  FMethodName := Value;
+  if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_METHOD_NAME) then
+    CatalogObject.Value[PROPERTY_NAME_METHOD_NAME] := Value;
+end;
+
+procedure TComAdminTransientSubscription.SetPerUser(const Value: Boolean);
+begin
+  FPerUser := Value;
+  if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_PER_USER) then
+    CatalogObject.Value[PROPERTY_NAME_PER_USER] := Value;
+end;
+
+procedure TComAdminTransientSubscription.SetPublisherID(const Value: string);
+begin
+  FPublisherID := Value;
+  if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_PUBLISHER_ID) then
+    CatalogObject.Value[PROPERTY_NAME_PUBLISHER_ID] := Value;
+end;
+
+procedure TComAdminTransientSubscription.SetSubscriberInterface(const Value: Variant);
+begin
+  FSubscriberInterface := Value;
+  if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_SUBSCRIBER_INTERFACE) then
+    CatalogObject.Value[PROPERTY_NAME_SUBSCRIBER_INTERFACE] := Value;
+end;
+
+procedure TComAdminTransientSubscription.SetSubscriberPartitionID(const Value: string);
+begin
+  FSubscriberPartitionID := Value;
+  if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_SUBSCRIBER_PARTITION_ID) then
+    CatalogObject.Value[PROPERTY_NAME_SUBSCRIBER_PARTITION_ID] := Value;
+end;
+
+procedure TComAdminTransientSubscription.SetUserName(const Value: string);
+begin
+  FUserName := Value;
+  if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_USER_NAME) then
+    CatalogObject.Value[PROPERTY_NAME_USER_NAME] := Value;
+end;
+
+{ TComAdminTransientSubscriptionList }
+
+function TComAdminTransientSubscriptionList.GetItem(Index: Integer): TComAdminTransientSubscription;
+begin
+  Result := inherited Items[Index] as TComAdminTransientSubscription;
+end;
+
 { TComAdminCatalog }
 
 constructor TComAdminCatalog.Create(const AServer, AFilter: string; AOnReadEvent: TComAdminReadEvent);
@@ -2392,32 +2618,42 @@ begin
   else
     FFilter := AFilter;
 
+  FAvailableCollections := ReadAvailableCollections;
+
   FApplicationCluster := TComAdminApplicationCluster.Create(nil, Self, FCatalog.GetCollection(COLLECTION_NAME_APPLICATION_CLUSTER) as ICatalogCollection);
   FApplications := TComAdminApplicationList.Create(nil, Self, FCatalog.GetCollection(COLLECTION_NAME_APPS) as ICatalogCollection);
+  FComputer := TComAdminComputer.Create(FCatalog.GetCollection(COLLECTION_NAME_COMPUTER) as ICatalogCollection);
   FEventClasses := TComAdminEventClassList.Create(nil, Self, FCatalog.GetCollection(COLLECTION_NAME_EVENT_CLASSES) as ICatalogCollection);
+  FInprocServers := TComAdminInprocServerList.Create(nil, Self, FCatalog.GetCollection(COLLECTION_NAME_INPROC_SERVERS) as ICatalogCollection);
   FPartitions := TComAdminPartitionList.Create(nil, Self, FCatalog.GetCollection(COLLECTION_NAME_PARTITIONS) as ICatalogCollection);
   FProtocols := TComAdminDCOMProtocolList.Create(nil, Self, FCatalog.GetCollection(COLLECTION_NAME_DCOM_PROTOCOLS) as ICatalogCollection);
-  FComputer := TComAdminComputer.Create(FCatalog.GetCollection(COLLECTION_NAME_COMPUTER) as ICatalogCollection);
+  FTransientSubscriptions := TComAdminTransientSubscriptionList.Create(nil, Self, FCatalog.GetCollection(COLLECTION_NAME_TRANSIENT_SUBSCRIPTION) as ICatalogCollection);
 
   GetApplications;
   GetEventClasses;
+  if False then GetInprocServers;
   GetPartitions;
   GetProtocols;
   GetServers;
+  GetTransientSubscription;
 
 end;
 
 destructor TComAdminCatalog.Destroy;
 begin
+  FApplicationCluster.Free;
+  FApplications.Free;
+  FAvailableCollections.Clear;
+  FAvailableCollections.Free;
+  FComputer.Free;
+  FCopiedLibraries.Free;
+  FEventClasses.Free;
+  FInprocServers.Free;
+  FPartitions.Free;
   FPasswords.Clear;
   FPasswords.Free;
-  FCopiedLibraries.Free;
-  FApplications.Free;
-  FComputer.Free;
-  FEventClasses.Free;
-  FPartitions.Free;
   FProtocols.Free;
-  FApplicationCluster.Free;
+  FTransientSubscriptions.Free;
   inherited;
 end;
 
@@ -2487,6 +2723,14 @@ begin
     FEventClasses.Add(TComAdminEventClass.Create(FEventClasses, FEventClasses.CatalogCollection.Item[i] as ICatalogObject));
 end;
 
+procedure TComAdminCatalog.GetInprocServers;
+var
+  i: Integer;
+begin
+  for i := 0 to FInprocServers.CatalogCollection.Count - 1 do
+    FInprocServers.Add(TComAdminInprocServer.Create(FInprocServers, FInprocServers.CatalogCollection.Item[i] as ICatalogObject));
+end;
+
 procedure TComAdminCatalog.GetPartitions;
 var
   i: Integer;
@@ -2519,6 +2763,26 @@ var
 begin
   for i := 0 to FApplicationCluster.CatalogCollection.Count - 1 do
     FApplicationCluster.Add(TComAdminApplicationServer.Create(FApplicationCluster, FApplicationCluster.CatalogCollection.Item[i] as ICatalogObject));
+end;
+
+procedure TComAdminCatalog.GetTransientSubscription;
+var
+  i: Integer;
+begin
+  for i := 0 to FTransientSubscriptions.CatalogCollection.Count - 1 do
+    FTransientSubscriptions.Add(TComAdminTransientSubscription.Create(FTransientSubscriptions, FTransientSubscriptions.CatalogCollection.Item[i] as ICatalogObject));
+end;
+
+function TComAdminCatalog.ReadAvailableCollections: TList<string>;
+var
+  CollectionList: ICatalogCollection;
+  i: Integer;
+begin
+  Result := TList<string>.Create;
+  CollectionList := FCatalog.GetCollection(COLLECTION_NAME_RELATED_COLLECTIONS) as ICatalogCollection;
+  CollectionList.Populate;
+  for i := 0 to CollectionList.Count - 1 do
+    Result.Add((CollectionList.Item[i] as ICatalogObject).Name);
 end;
 
 procedure TComAdminCatalog.SetFilter(const Value: string);
