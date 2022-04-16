@@ -1,4 +1,4 @@
-# ComAdmin
+﻿# ComAdmin
 ![](https://tokei.rs/b1/github/DEV2DEV-DE/ComAdmin?category=code)
 ![](https://tokei.rs/b1/github/DEV2DEV-DE/ComAdmin?category=files)
 
@@ -42,6 +42,14 @@ https://docs.microsoft.com/en-us/windows/win32/cossdk/com--administration-collec
     ● Protocol
   ∞ EventClasses (+/-)
     ● EventClass
+  ∞ InprocServers (-)
+    ● InprocServer
+  ∞ TransientSubscriptions (+/-)
+    ● TransientSubscription
+      ∞ Publishers (+/-)
+        ● Values
+      ∞ Subscribers (+/-)
+        ● Values
 ```
 \+ This collection supports an Add method
 

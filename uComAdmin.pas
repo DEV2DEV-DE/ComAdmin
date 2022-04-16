@@ -690,22 +690,44 @@ type
     property Items[Index: Integer]: TComAdminInprocServer read GetItem; default;
   end;
 
+  TComAdminSubscriberProperties = class(TComAdminBaseObject)
+  strict private
+    FValue: Variant;
+    procedure ReadExtendedProperties;
+    procedure SetValue(AValue: Variant);
+  public
+    constructor Create(ACollection: TComAdminBaseList; ACatalogObject: ICatalogObject); reintroduce;
+  published
+    property Value: Variant read FValue write SetValue;
+  end;
+
+  TComAdminSubscriberPropertiesList = class(TComAdminBaseList)
+  strict private
+    function GetItem(Index: Integer): TComAdminSubscriberProperties;
+  public
+    property Items[Index: Integer]: TComAdminSubscriberProperties read GetItem; default;
+  end;
+
   TComAdminTransientSubscription = class(TComAdminBaseObject)
   strict private
     FDescription: string;
-    FInterfaceID: string;
     FEnabled: Boolean;
-    FFilterCriteria: string;
-    FMethodName: string;
-    FEventCLSID: string;
     FEventClassPartitionID: string;
+    FEventCLSID: string;
+    FFilterCriteria: string;
     FID: string;
-    FSubscriberPartitionID: string;
+    FInterfaceID: string;
+    FMethodName: string;
+    FPerUser: Boolean;
     FPublisherID: string;
     FSubscriberInterface: Variant;
-    FPerUser: Boolean;
+    FSubscriberPartitionID: string;
     FUserName: string;
+    FPublishers: TComAdminSubscriberPropertiesList;
+    FSubscribers: TComAdminSubscriberPropertiesList;
     procedure ReadExtendedProperties;
+    procedure GetPublishers;
+    procedure GetSubscribers;
     procedure SetDescription(const Value: string);
     procedure SetEnabled(const Value: Boolean);
     procedure SetEventClassPartitionID(const Value: string);
@@ -721,6 +743,7 @@ type
     procedure SetUserName(const Value: string);
   public
     constructor Create(ACollection: TComAdminBaseList; ACatalogObject: ICatalogObject); reintroduce;
+    destructor Destroy; override;
   published
     property Description: string read FDescription write SetDescription;
     property Enabled: Boolean read FEnabled write SetEnabled;
@@ -2474,12 +2497,64 @@ begin
   Result := inherited Items[Index] as TComAdminInprocServer;
 end;
 
+{ TComAdminSubscriberProperties }
+
+constructor TComAdminSubscriberProperties.Create(ACollection: TComAdminBaseList; ACatalogObject: ICatalogObject);
+begin
+  inherited Create(ACollection, ACatalogObject);
+  ReadExtendedProperties;
+end;
+
+procedure TComAdminSubscriberProperties.ReadExtendedProperties;
+begin
+  FValue := CatalogObject.Value[PROPERTY_NAME_VALUE];
+end;
+
+procedure TComAdminSubscriberProperties.SetValue(AValue: Variant);
+begin
+  FValue := AValue;
+end;
+
+{ TComAdminSubscriberPropertiesList }
+
+function TComAdminSubscriberPropertiesList.GetItem(Index: Integer): TComAdminSubscriberProperties;
+begin
+  Result := inherited Items[Index] as TComAdminSubscriberProperties;
+end;
+
 { TComAdminTransientSubscription }
 
 constructor TComAdminTransientSubscription.Create(ACollection: TComAdminBaseList; ACatalogObject: ICatalogObject);
 begin
   inherited Create(ACollection, ACatalogObject);
+  FPublishers := TComAdminSubscriberPropertiesList.Create(Self, ACollection.Catalog, ACollection.CatalogCollection.GetCollection(COLLECTION_NAME_TRANSIENT_PUBLISHERS, Key) as ICatalogCollection);
+  FSubscribers := TComAdminSubscriberPropertiesList.Create(Self, ACollection.Catalog, ACollection.CatalogCollection.GetCollection(COLLECTION_NAME_TRANSIENT_SUBSCRIBERS, Key) as ICatalogCollection);
   ReadExtendedProperties;
+  GetPublishers;
+  GetSubscribers;
+end;
+
+destructor TComAdminTransientSubscription.Destroy;
+begin
+  FPublishers.Free;
+  FSubscribers.Free;
+  inherited;
+end;
+
+procedure TComAdminTransientSubscription.GetPublishers;
+var
+  i: Integer;
+begin
+  for i := 0 to FPublishers.CatalogCollection.Count - 1 do
+    FPublishers.Add(TComAdminRole.Create(FPublishers, FPublishers.CatalogCollection.Item[i] as ICatalogObject));
+end;
+
+procedure TComAdminTransientSubscription.GetSubscribers;
+var
+  i: Integer;
+begin
+  for i := 0 to FSubscribers.CatalogCollection.Count - 1 do
+    FSubscribers.Add(TComAdminRole.Create(FSubscribers, FSubscribers.CatalogCollection.Item[i] as ICatalogObject));
 end;
 
 procedure TComAdminTransientSubscription.ReadExtendedProperties;

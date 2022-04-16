@@ -47,6 +47,8 @@ const
   COLLECTION_NAME_RELATED_COLLECTIONS = 'RelatedCollectionInfo';
   COLLECTION_NAME_ROLES = 'Roles';
   COLLECTION_NAME_TRANSIENT_SUBSCRIPTION = 'TransientSubscriptions';
+  COLLECTION_NAME_TRANSIENT_PUBLISHERS = 'TransientPublisherProperties';
+  COLLECTION_NAME_TRANSIENT_SUBSCRIBERS = 'TransientSubscriberProperties';
   COLLECTION_NAME_USERS = 'UsersInRole';
   COLLECTION_NAME_USERS_PARTITION = 'UsersInPartitionRole';
 
@@ -185,4 +187,5 @@ const
   PROPERTY_NAME_TRANSACTION_TIMEOUT = 'TransactionTimeout';
   PROPERTY_NAME_USER = 'User';
   PROPERTY_NAME_USER_NAME = 'UserName';
+  PROPERTY_NAME_VALUE = 'Value';
 
