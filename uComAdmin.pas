@@ -68,12 +68,21 @@ type
   end;
 
   // forward declaration of internally used classes
+  TComAdminBaseObject = class;
   TComAdminBaseList = class;
   TComAdminCatalog = class;
+
+  TComAdminAvailableCollections = class(TList<string>)
+  public
+    constructor Create(ACatalog: ICOMAdminCatalog2); reintroduce; overload;
+    constructor Create(ABaseObject: TComAdminBaseObject); reintroduce; overload;
+    destructor Destroy; override;
+  end;
 
   // generic base class for all single objects
   TComAdminBaseObject = class(TInterfacedObject)
   strict private
+    FAvailableCollections: TList<string>;
     FCatalogCollection: ICatalogCollection;
     FCatalogObject: ICatalogObject;
     FCollection: TComAdminBaseList;
@@ -84,7 +93,9 @@ type
     function InternalCheckRange(AMinValue, AMaxValue, AValue: Cardinal): Boolean;
   public
     constructor Create(ACollection: TComAdminBaseList; ACatalogObject: ICatalogObject); reintroduce;
+    destructor Destroy; override;
     procedure CopyProperties(ASourceObject, ATargetObject: TComAdminBaseObject);
+    property AvailableCollections: TList<string> read FAvailableCollections;
     property CatalogCollection: ICatalogCollection read FCatalogCollection;
     property CatalogObject: ICatalogObject read FCatalogObject;
     property Collection: TComAdminBaseList read FCollection;
@@ -774,7 +785,7 @@ type
   strict private
     FApplicationCluster: TComAdminApplicationCluster;
     FApplications: TComAdminApplicationList;
-    FAvailableCollections: TList<string>;
+    FAvailableCollections: TComAdminAvailableCollections;
     FCatalog: ICOMAdminCatalog2;
     FChangeCount: Integer;
     FComputer: TComAdminComputer;
@@ -800,7 +811,6 @@ type
     procedure GetServers;
     procedure GetTransientSubscription;
     function GetLocalComputerName: string;
-    function ReadAvailableCollections: TList<string>;
     procedure SetFilter(const Value: string);
   public
     constructor Create(const AServer: string; const AFilter: string; AOnReadEvent: TComAdminReadEvent); reintroduce; overload;
@@ -854,6 +864,38 @@ begin
   raise Exception.CreateFmt(ERROR_EXTENDED_MESSAGE, [ErrorCode, MajorRef, MinorRef, Name]);
 end;
 
+{ TComAdminAvailableCollections }
+
+constructor TComAdminAvailableCollections.Create(ACatalog: ICOMAdminCatalog2);
+var
+  CollectionList: ICatalogCollection;
+  i: Integer;
+begin
+  inherited Create;
+  CollectionList := ACatalog.GetCollection(COLLECTION_NAME_RELATED_COLLECTIONS) as ICatalogCollection;
+  CollectionList.Populate;
+  for i := 0 to CollectionList.Count - 1 do
+    Add((CollectionList.Item[i] as ICatalogObject).Name);
+end;
+
+constructor TComAdminAvailableCollections.Create(ABaseObject: TComAdminBaseObject);
+var
+  CollectionList: ICatalogCollection;
+  i: Integer;
+begin
+  inherited Create;
+  CollectionList := ABaseObject.CatalogCollection.GetCollection(COLLECTION_NAME_RELATED_COLLECTIONS, ABaseObject.Key) as ICatalogCollection;
+  CollectionList.Populate;
+  for i := 0 to CollectionList.Count - 1 do
+    Add((CollectionList.Item[i] as ICatalogObject).Name);
+end;
+
+destructor TComAdminAvailableCollections.Destroy;
+begin
+  Clear;
+  inherited;
+end;
+
 { TComAdminBaseObject }
 
 constructor TComAdminBaseObject.Create(ACollection: TComAdminBaseList; ACatalogObject: ICatalogObject);
@@ -861,14 +903,22 @@ begin
   inherited Create;
   FCollection := ACollection;
   FCatalogObject := ACatalogObject;
+  FKey := FCatalogObject.Key;
+  FName := FCatalogObject.Name;
   if Assigned(ACollection) then
   begin
     FCatalogCollection := ACollection.CatalogCollection;
     if Assigned(ACollection.Catalog.OnReadObject) then
       ACollection.Catalog.OnReadObject(ACollection.Name, ACatalogObject.Name);
+    FAvailableCollections := TComAdminAvailableCollections.Create(Self);
   end;
-  FKey := FCatalogObject.Key;
-  FName := FCatalogObject.Name;
+end;
+
+destructor TComAdminBaseObject.Destroy;
+begin
+  if Assigned(FAvailableCollections) then
+    FAvailableCollections.Free;
+  inherited;
 end;
 
 procedure TComAdminBaseObject.CopyProperties(ASourceObject, ATargetObject: TComAdminBaseObject);
@@ -2695,7 +2745,7 @@ begin
   else
     FFilter := AFilter;
 
-  FAvailableCollections := ReadAvailableCollections;
+  FAvailableCollections := TComAdminAvailableCollections.Create(FCatalog);
 
   FApplicationCluster := TComAdminApplicationCluster.Create(nil, Self, FCatalog.GetCollection(COLLECTION_NAME_APPLICATION_CLUSTER) as ICatalogCollection);
   FApplications := TComAdminApplicationList.Create(nil, Self, FCatalog.GetCollection(COLLECTION_NAME_APPS) as ICatalogCollection);
@@ -2720,7 +2770,6 @@ destructor TComAdminCatalog.Destroy;
 begin
   FApplicationCluster.Free;
   FApplications.Free;
-  FAvailableCollections.Clear;
   FAvailableCollections.Free;
   FComputer.Free;
   FCopiedLibraries.Free;
@@ -2861,18 +2910,6 @@ begin
     Result := Buffer
   else
     Result := '';
-end;
-
-function TComAdminCatalog.ReadAvailableCollections: TList<string>;
-var
-  CollectionList: ICatalogCollection;
-  i: Integer;
-begin
-  Result := TList<string>.Create;
-  CollectionList := FCatalog.GetCollection(COLLECTION_NAME_RELATED_COLLECTIONS) as ICatalogCollection;
-  CollectionList.Populate;
-  for i := 0 to CollectionList.Count - 1 do
-    Result.Add((CollectionList.Item[i] as ICatalogObject).Name);
 end;
 
 procedure TComAdminCatalog.SetFilter(const Value: string);
