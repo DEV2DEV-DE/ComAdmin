@@ -23,6 +23,7 @@ begin
   end;
 end;
 ```
+Just provide an empty string as the first parameter of the constructor if you want to access the catalog of the local computer.
 
 ## Class-Hierarchy:
 ```
