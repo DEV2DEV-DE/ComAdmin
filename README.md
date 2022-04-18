@@ -8,6 +8,22 @@ Links to MS documentation:
 
 https://docs.microsoft.com/en-us/windows/win32/cossdk/com--administration-collections#collection-hierarchy
 
+## Usage
+```pascal
+var
+  ComCatalog: TComAdminCatalog;
+  i: Integer;
+begin
+  ComCatalog := TComAdminCatalog.Create('MyServerName', '*', nil);
+  try
+    for i := 0 to ComCatalog.Applications.Count - 1 do
+      Memo1.Lines.Add(ComCatalog.Applications[i].Name);
+  finally
+    ComCatalog.Free;
+  end;
+end;
+```
+
 ## Class-Hierarchy:
 ```
 ● Catalog
