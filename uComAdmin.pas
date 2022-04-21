@@ -38,7 +38,7 @@ type
   TCOMAdminSRPTrustLevel = (COMAdminSRPDisallow = $0, COMAminSRPFullyTrusted = $40000);
   TCOMAdminProtocol = (COMAdminProtocolTCP, COMAdminProtocolHTTP, COMAdminProtocolSPX);
 
-  TComAdminReadEvent = procedure (const AObjectType, AObjectName: string) of object;
+  TComAdminReadEvent = procedure (ALevel: Integer; const AObjectType, AObjectName: string) of object;
   TComAdminDebug = procedure(const AMessage: string) of object;
 
 const
@@ -77,32 +77,35 @@ type
     constructor Create(ACatalog: ICOMAdminCatalog2); reintroduce; overload;
     constructor Create(ABaseObject: TComAdminBaseObject); reintroduce; overload;
     destructor Destroy; override;
+    function ToString: string; reintroduce;
   end;
 
   // generic base class for all single objects
   TComAdminBaseObject = class(TInterfacedObject)
   strict private
-    FAvailableCollections: TList<string>;
+    FAvailableCollections: TComAdminAvailableCollections;
     FCatalogCollection: ICatalogCollection;
     FCatalogObject: ICatalogObject;
     FCollection: TComAdminBaseList;
+    FLevel: Integer;
     FKey: string;
     FName: string;
     FSupportsUsers: Boolean;
+    function GetLevel: Integer;
   private
     function InternalCheckRange(AMinValue, AMaxValue, AValue: Cardinal): Boolean;
   public
-    constructor Create(ACollection: TComAdminBaseList; ACatalogObject: ICatalogObject); reintroduce;
+    constructor Create(ACollection: TComAdminBaseList; ACatalogObject: ICatalogObject); reintroduce; overload;
     destructor Destroy; override;
     procedure CopyProperties(ASourceObject, ATargetObject: TComAdminBaseObject);
-    property AvailableCollections: TList<string> read FAvailableCollections;
+    property AvailableCollections: TComAdminAvailableCollections read FAvailableCollections;
     property CatalogCollection: ICatalogCollection read FCatalogCollection;
     property CatalogObject: ICatalogObject read FCatalogObject;
     property Collection: TComAdminBaseList read FCollection;
     property Key: string read FKey write FKey;
+    property Level: Integer read FLevel;
+    property Name: string read FName write FName; // will be set to published in some ancestors to provide copying
     property SupportsUsers: Boolean read FSupportsUsers write FSupportsUsers default False;
-  published
-    property Name: string read FName write FName;
   end;
 
   // generic list class for all collections of objects
@@ -126,6 +129,8 @@ type
   end;
 
   TComAdminUser = class(TComAdminBaseObject)
+  published
+    property Name;
   end;
 
   TComAdminUserList = class(TComAdminBaseList)
@@ -142,6 +147,7 @@ type
     FDescription: string;
     FUsers: TComAdminUserList;
     procedure GetUsers;
+    function HasUsersCollection: Boolean;
     procedure SetDescription(const Value: string);
   public
     constructor Create(ACollection: TComAdminBaseList; ACatalogObject: ICatalogObject); reintroduce;
@@ -151,6 +157,7 @@ type
     property Users: TComAdminUserList read FUsers write FUsers;
   published
     property Description: string read FDescription write SetDescription;
+    property Name;
   end;
 
   TComAdminRoleList = class(TComAdminBaseList)
@@ -174,6 +181,7 @@ type
     property HasRecycled: Boolean read FHasRecycled;
     property IsPaused: Boolean read FIsPaused;
     property ProcessID: Cardinal read FProcessID;
+    property Name;
   end;
 
   TComAdminInstanceList = class(TComAdminBaseList)
@@ -206,6 +214,7 @@ type
     property Deleteable: Boolean read FDeleteable write SetDeleteable default True;
     property Description: string read FDescription write SetDescription;
     property ID: string read FID write SetID;
+    property Name;
   end;
 
   TComAdminPartitionList = class(TComAdminBaseList)
@@ -237,6 +246,7 @@ type
     property CLSID: string read FCLSID;
     property IID: string read FIID;
     property Index: Cardinal read FIndex;
+    property Name;
   end;
 
   TComAdminMethodList = class(TComAdminBaseList)
@@ -269,6 +279,7 @@ type
     property CLSID: string read FCLSID;
     property Description: string read FDescription write SetFDescription;
     property IID: string read FIID;
+    property Name;
     property QueuingEnabled: Boolean read FQueuingEnabled write SetQueuingEnabled;
     property QueuingSupported: Boolean read FQueuingSupported;
   end;
@@ -352,11 +363,11 @@ type
     constructor Create(ACollection: TComAdminBaseList; ACatalogObject: ICatalogObject); reintroduce;
     destructor Destroy; override;
     function CopyProperties(ASourceComponent: TCOMAdminComponent): Integer;
+    property ApplicationID: string read FApplicationID write SetApplicationID;
     property Roles: TComAdminRoleList read FRoles write FRoles;
     property Interfaces: TComAdminInterfaceList read FInterfaces write FInterfaces;
   published
     property AllowInprocSubscribers: Boolean read FAllowInprocSubscribers write SetAllowInprocSubscribers default True;
-    property ApplicationID: string read FApplicationID write SetApplicationID;
     property Bitness: TCOMAdminComponentType read FBitness write SetBitness;
     property ComponentAccessChecksEnabled: Boolean read FComponentAccessChecksEnabled write SetComponentAccessChecksEnabled default False;
     property ComponentTransactionTimeout: Cardinal read FComponentTransactionTimeout write SetComponentTransactionTimeout default DEFAULT_TRANSACTION_TIMEOUT;
@@ -383,6 +394,7 @@ type
     property MultiInterfacePublisherFilterCLSID: string read FMultiInterfacePublisherFilterCLSID write SetMultiInterfacePublisherFilterCLSID;
     property MustRunInClientContext: Boolean read FMustRunInClientContext write SetMustRunInClientContext default False;
     property MustRunInDefaultContext: Boolean read FMustRunInDefaultContext write SetMustRunInDefaultContext default False;
+    property Name;
     property ObjectPoolingEnabled: Boolean read FObjectPoolingEnabled write SetObjectPoolingEnabled default False;
     property ProgID: string read FProgID write SetProgID;
   end;
@@ -390,7 +402,7 @@ type
   TCOMAdminComponentList = class(TComAdminBaseList)
   strict private
     function GetItem(Index: Integer): TCOMAdminComponent;
-    function BuildTargetLibraryName(ASourceComponent: TCOMAdminComponent): string;
+    function BuildLibraryName(AComponent: TCOMAdminComponent): string;
   public
     function Append(ASourceComponent: TCOMAdminComponent): TCOMAdminComponent;
     function CopyLibrary(ASourceComponent: TCOMAdminComponent; AOverwrite: Boolean = False): Boolean;
@@ -512,6 +524,7 @@ type
     function CopyToServer(ATargetServer: TComAdminCatalog; AOptions: Integer): Boolean;
     function InstallComponent(const ALibraryName: string): TCOMAdminComponent;
     function IsIntegratedIdentity: Boolean;
+    procedure SetApplicationEnabled(AValue: Boolean);
     property Components: TCOMAdminComponentList read FComponents;
     property Instances: TComAdminInstanceList read GetInstances;
     property Roles: TComAdminRoleList read FRoles write FRoles;
@@ -541,6 +554,7 @@ type
     property IsEnabled: Boolean read FIsEnabled write SetIsEnabled default True;
     property IsSystem: Boolean read FIsSystem default False;
     property MaxDumpCount: Cardinal read FMaxDumpCount write SetMaxDumpCount default DEFAULT_MAX_DUMP;
+    property Name;
     property PartitionID: string read FPartitionID write SetPartitionID;
     property Password: string write SetPassword;
     property Proxy: Boolean read FProxy write SetProxy default False;
@@ -580,6 +594,7 @@ type
     FApplicationProxyRSN: string;
     FAuthenticationLevel: TCOMAdminAuthenticationLevel;
     FCISEnabled: Boolean;
+    FCollection: ICatalogCollection;
     FDCOMEnabled: Boolean;
     FDefaultToInternetPorts: Boolean;
     FDescription: string;
@@ -590,6 +605,7 @@ type
     FLoadBalancingCLSID: string;
     FLocalPartitionLookupEnabled: Boolean;
     FOperatingSystem: TCOMAdminOperatingSystem;
+    FOwner: TComAdminCatalog;
     FPartitionsEnabled: Boolean;
     FPorts: string;
     FResourcePoolingEnabled: Boolean;
@@ -600,31 +616,54 @@ type
     FSRPRunningObjectChecks: Boolean;
     FTransactionTimeout: Cardinal;
     procedure ReadExtendedProperties;
+    procedure SetApplicationProxyRSN(const Value: string);
+    procedure SetAuthenticationLevel(const Value: TCOMAdminAuthenticationLevel);
+    procedure SetCISEnabled(const Value: Boolean);
+    procedure SetDCOMEnabled(const Value: Boolean);
+    procedure SetDefaultToInternetPorts(const Value: Boolean);
+    procedure SetDescription(const Value: string);
+    procedure SetDSPartitionLookupEnabled(const Value: Boolean);
+    procedure SetImpersonationLevel(const Value: TCOMAdminImpersonationLevel);
+    procedure SetInternetPortsListed(const Value: Boolean);
+    procedure SetIsRouter(const Value: Boolean);
+    procedure SetLoadBalancingCLSID(const Value: string);
+    procedure SetLocalPartitionLookupEnabled(const Value: Boolean);
+    procedure SetOperatingSystem(const Value: TCOMAdminOperatingSystem);
+    procedure SetPartitionsEnabled(const Value: Boolean);
+    procedure SetPorts(const Value: string);
+    procedure SetResourcePoolingEnabled(const Value: Boolean);
+    procedure SetRPCProxyEnabled(const Value: Boolean);
+    procedure SetSecureReferencesEnabled(const Value: Boolean);
+    procedure SetSecurityTrackingEnabled(const Value: Boolean);
+    procedure SetSRPActivateAsActivatorChecks(const Value: Boolean);
+    procedure SetSRPRunningObjectChecks(const Value: Boolean);
     procedure SetTransactionTimeout(const Value: Cardinal);
   public
-    constructor Create(ACatalogCollection: ICatalogCollection); reintroduce;
+    constructor Create(AOwner: TComAdminCatalog; ACatalogCollection: ICatalogCollection); reintroduce;
+    procedure SyncFromServer(ASourceComputer: TComAdminComputer);
+    property Owner: TComAdminCatalog read FOwner;
   published
-    property ApplicationProxyRSN: string read FApplicationProxyRSN write FApplicationProxyRSN;
-    property CISEnabled: Boolean read FCISEnabled write FCISEnabled default False;
-    property DCOMEnabled: Boolean read FDCOMEnabled write FDCOMEnabled default True;
-    property DefaultAuthenticationLevel: TCOMAdminAuthenticationLevel read FAuthenticationLevel write FAuthenticationLevel default COMAdminAuthenticationConnect;
-    property DefaultImpersonationLevel: TCOMAdminImpersonationLevel read FImpersonationLevel write FImpersonationLevel default COMAdminImpersonationIdentify;
-    property DefaultToInternetPorts: Boolean read FDefaultToInternetPorts write FDefaultToInternetPorts default False;
-    property Description: string read FDescription write FDescription;
-    property DSPartitionLookupEnabled: Boolean read FDSPartitionLookupEnabled write FDSPartitionLookupEnabled default True;
-    property InternetPortsListed: Boolean read FInternetPortsListed write FInternetPortsListed default False;
-    property IsRouter: Boolean read FIsRouter write FIsRouter default False;
-    property LoadBalancingCLSID: string read FLoadBalancingCLSID write FLoadBalancingCLSID;
-    property LocalPartitionLookupEnabled: Boolean read FLocalPartitionLookupEnabled write FLocalPartitionLookupEnabled default True;
-    property OperatingSystem: TCOMAdminOperatingSystem read FOperatingSystem write FOperatingSystem default COMAdminOSNotInitialized;
-    property PartitionsEnabled: Boolean read FPartitionsEnabled write FPartitionsEnabled default False;
-    property Ports: string read FPorts write FPorts;
-    property ResourcePoolingEnabled: Boolean read FResourcePoolingEnabled write FResourcePoolingEnabled default True;
-    property RPCProxyEnabled: Boolean read FRPCProxyEnabled write FRPCProxyEnabled default False;
-    property SecureReferencesEnabled: Boolean read FSecureReferencesEnabled write FSecureReferencesEnabled default False;
-    property SecurityTrackingEnabled: Boolean read FSecurityTrackingEnabled write FSecurityTrackingEnabled default True;
-    property SRPActivateAsActivatorChecks: Boolean read FSRPActivateAsActivatorChecks write FSRPActivateAsActivatorChecks default True;
-    property SRPRunningObjectChecks: Boolean read FSRPRunningObjectChecks write FSRPRunningObjectChecks default True;
+    property ApplicationProxyRSN: string read FApplicationProxyRSN write SetApplicationProxyRSN;
+    property CISEnabled: Boolean read FCISEnabled write SetCISEnabled default False;
+    property DCOMEnabled: Boolean read FDCOMEnabled write SetDCOMEnabled default True;
+    property DefaultAuthenticationLevel: TCOMAdminAuthenticationLevel read FAuthenticationLevel write SetAuthenticationLevel default COMAdminAuthenticationConnect;
+    property DefaultImpersonationLevel: TCOMAdminImpersonationLevel read FImpersonationLevel write SetImpersonationLevel default COMAdminImpersonationIdentify;
+    property DefaultToInternetPorts: Boolean read FDefaultToInternetPorts write SetDefaultToInternetPorts default False;
+    property Description: string read FDescription write SetDescription;
+    property DSPartitionLookupEnabled: Boolean read FDSPartitionLookupEnabled write SetDSPartitionLookupEnabled default True;
+    property InternetPortsListed: Boolean read FInternetPortsListed write SetInternetPortsListed default False;
+    property IsRouter: Boolean read FIsRouter write SetIsRouter default False;
+    property LoadBalancingCLSID: string read FLoadBalancingCLSID write SetLoadBalancingCLSID;
+    property LocalPartitionLookupEnabled: Boolean read FLocalPartitionLookupEnabled write SetLocalPartitionLookupEnabled default True;
+    property OperatingSystem: TCOMAdminOperatingSystem read FOperatingSystem write SetOperatingSystem default COMAdminOSNotInitialized;
+    property PartitionsEnabled: Boolean read FPartitionsEnabled write SetPartitionsEnabled default False;
+    property Ports: string read FPorts write SetPorts;
+    property ResourcePoolingEnabled: Boolean read FResourcePoolingEnabled write SetResourcePoolingEnabled default True;
+    property RPCProxyEnabled: Boolean read FRPCProxyEnabled write SetRPCProxyEnabled default False;
+    property SecureReferencesEnabled: Boolean read FSecureReferencesEnabled write SetSecureReferencesEnabled default False;
+    property SecurityTrackingEnabled: Boolean read FSecurityTrackingEnabled write SetSecurityTrackingEnabled default True;
+    property SRPActivateAsActivatorChecks: Boolean read FSRPActivateAsActivatorChecks write SetSRPActivateAsActivatorChecks default True;
+    property SRPRunningObjectChecks: Boolean read FSRPRunningObjectChecks write SetSRPRunningObjectChecks default True;
     property TransactionTimeout: Cardinal read FTransactionTimeout write SetTransactionTimeout default DEFAULT_TRANSACTION_TIMEOUT;
   end;
 
@@ -642,6 +681,7 @@ type
   public
     constructor Create(ACollection: TComAdminBaseList; ACatalogObject: ICatalogObject); reintroduce;
   published
+    property Name;
     property Order: Cardinal read FOrder write SetOrder default 0;
     property ProtocolCode: TCOMAdminProtocol read FProtocolCode write SetProtocolCode;
   end;
@@ -670,6 +710,7 @@ type
     property CLSID: string read FCLSID;
     property Description: string read FDescription;
     property IsPrivateComponent: Boolean read FIsPrivateComponent default False;
+    property Name;
     property ProgID: string read FProgID;
   end;
 
@@ -691,6 +732,7 @@ type
   published
     property CLSID: string read FCLSID;
     property InprocServer32: string read FInprocServer32;
+    property Name;
     property ProdID: string read FProgID;
   end;
 
@@ -709,6 +751,7 @@ type
   public
     constructor Create(ACollection: TComAdminBaseList; ACatalogObject: ICatalogObject); reintroduce;
   published
+    property Name;
     property Value: Variant read FValue write SetValue;
   end;
 
@@ -764,6 +807,7 @@ type
     property ID: string read FID write SetID;
     property InterfaceID: string read FInterfaceID write SetInterfaceID;
     property MethodName_: string read FMethodName write SetMethodName;
+    property Name;
     property PerUser: Boolean read FPerUser write SetPerUser;
     property PublisherID: string read FPublisherID write SetPublisherID;
     property SubscriberInterface: Variant read FSubscriberInterface write SetSubscriberInterface;
@@ -779,7 +823,10 @@ type
   end;
 
   // List class to hold passwords for different identities
-  TPasswordList = TList<TPair<string,string>>;
+  TPasswordList = class(TList<TPair<string,string>>)
+  public
+    destructor Destroy; override;
+  end;
 
   TComAdminCatalog = class(TObject)
   strict private
@@ -813,7 +860,7 @@ type
     function GetLocalComputerName: string;
     procedure SetFilter(const Value: string);
   public
-    constructor Create(const AServer: string; const AFilter: string; AOnReadEvent: TComAdminReadEvent); reintroduce; overload;
+    constructor Create(const AServer: string; const AFilter: string; AOnReadEvent: TComAdminReadEvent; AOnDebug: TComAdminDebug); reintroduce; overload;
     destructor Destroy; override;
     procedure AddPasswordForIdentity(const AIdentity, APassword: string);
     procedure DebugMessage(const AMessage: string); overload;
@@ -822,7 +869,8 @@ type
     procedure ExportApplicationByKey(const AKey, AFilename: string);
     procedure ExportApplicationByName(const AName, AFilename: string);
     function GetPasswordForIdentity(const AIdentity: string): string;
-    function SyncToServer(const ATargetServer, ACreatorString: string): Integer; overload;
+    function IsLocalComputer: Boolean;
+    function SyncToServer(const ATargetServer, ACreatorString: string; ASyncComputers: Boolean = False): Integer; overload;
     property ApplicationCluster: TComAdminApplicationCluster read FApplicationCluster write FApplicationCluster;
     property Applications: TComAdminApplicationList read FApplications;
     property Catalog: ICOMAdminCatalog2 read FCatalog;
@@ -888,12 +936,27 @@ begin
   CollectionList.Populate;
   for i := 0 to CollectionList.Count - 1 do
     Add((CollectionList.Item[i] as ICatalogObject).Name);
+  if Assigned(ABaseObject.Collection) then
+    ABaseObject.Collection.Catalog.OnReadObject(ABaseObject.Level, COLLECTION_NAME_RELATED_COLLECTIONS, ToString);
 end;
 
 destructor TComAdminAvailableCollections.Destroy;
 begin
   Clear;
   inherited;
+end;
+
+function TComAdminAvailableCollections.ToString: string;
+var
+  i: Integer;
+begin
+  if Count > 0 then
+  begin
+    Result := Items[0];
+    for i := 1 to Count - 1 do
+      Result := Format('%s, %s', [Result, Items[i]]);
+  end else
+    Result := '';
 end;
 
 { TComAdminBaseObject }
@@ -907,9 +970,10 @@ begin
   FName := FCatalogObject.Name;
   if Assigned(ACollection) then
   begin
+    FLevel := GetLevel;
     FCatalogCollection := ACollection.CatalogCollection;
     if Assigned(ACollection.Catalog.OnReadObject) then
-      ACollection.Catalog.OnReadObject(ACollection.Name, ACatalogObject.Name);
+      ACollection.Catalog.OnReadObject(FLevel, ACollection.Name, ACatalogObject.Name);
     FAvailableCollections := TComAdminAvailableCollections.Create(Self);
   end;
 end;
@@ -919,6 +983,29 @@ begin
   if Assigned(FAvailableCollections) then
     FAvailableCollections.Free;
   inherited;
+end;
+
+function TComAdminBaseObject.GetLevel: Integer;
+begin
+  if Assigned(FCollection.Owner) then
+  begin
+    Result := 1;
+    if Assigned(FCollection.Owner.Collection.Owner) then
+    begin
+      Result := 2;
+      if Assigned(FCollection.Owner.Collection.Owner.Collection.Owner) then
+      begin
+        Result := 3;
+        if Assigned(FCollection.Owner.Collection.Owner.Collection.Owner.Collection.Owner) then
+        begin
+          Result := 4;
+          if Assigned(FCollection.Owner.Collection.Owner.Collection.Owner.Collection.Owner.Collection.Owner) then
+            Result := 5;
+        end;
+      end;
+    end;
+  end else
+    Result := 0;
 end;
 
 procedure TComAdminBaseObject.CopyProperties(ASourceObject, ATargetObject: TComAdminBaseObject);
@@ -938,9 +1025,11 @@ begin
     begin
       if (LProperty.IsReadable) and (LProperty.IsWritable) and (LProperty.Visibility = mvPublished) then
       begin
-        { TODO -odev2dev : also copy the properties from the source catalog object to the target }
         AValue := LProperty.GetValue(ASource.AsObject);
-        FCollection.Catalog.DebugMessage(DEBUG_MESSAGE_SET_PROPERTY, [LProperty.Name, AValue.ToString]);
+        if Assigned(FCollection) then
+          FCollection.Catalog.DebugMessage(DEBUG_MESSAGE_SET_PROPERTY, [LProperty.Name, AValue.ToString])
+        else if ASourceObject is TComAdminComputer then
+          (ASourceObject as TComAdminComputer).Owner.DebugMessage(DEBUG_MESSAGE_SET_PROPERTY, [LProperty.Name, AValue.ToString]);
         LProperty.SetValue(ATarget.AsObject, AValue);
       end;
     end;
@@ -1081,7 +1170,7 @@ begin
   inherited Create(ACollection, ACatalogObject);
 
 
-  if (ACollection.Owner.QueryInterface(IID_IUserCollection, LObject) = S_OK) then
+  if HasUsersCollection and (ACollection.Owner.QueryInterface(IID_IUserCollection, LObject) = S_OK) then
   begin
     FDescription := VarToStrDef(CatalogObject.Value[PROPERTY_NAME_DESCRIPTION], '');
     FUsers := TComAdminUserList.Create(Self, ACollection.Catalog, ACollection.CatalogCollection.GetCollection(LObject.GetUsersCollectionName, Key) as ICatalogCollection);
@@ -1107,11 +1196,13 @@ begin
     // Changes must be saved before any sub-collections can be updated
     Result := Collection.SaveChanges;
 
-    // Synchronize users from source role
-    SyncUsers(ASourceRole);
+    // If supported, synchronize users from source role
+    if HasUsersCollection then
+      SyncUsers(ASourceRole);
+
   except
     on E:Exception do
-      Collection.Catalog.DebugMessage('TComAdminRole.CopyProperties: ', [E.Message]);
+      Collection.Catalog.DebugMessage(DEBUG_MESSAGE_COPY_ROLE_PROPERTIES, [E.Message]);
   end;
 end;
 
@@ -1121,6 +1212,11 @@ var
 begin
   for i := 0 to FUsers.CatalogCollection.Count - 1 do
     FUsers.Add(TComAdminUser.Create(FUsers, FUsers.CatalogCollection.Item[i] as ICatalogObject));
+end;
+
+function TComAdminRole.HasUsersCollection: Boolean;
+begin
+  Result := AvailableCollections.Contains(COLLECTION_NAME_USERS);
 end;
 
 procedure TComAdminRole.SetDescription(const Value: string);
@@ -1152,7 +1248,6 @@ begin
   LRole.Value[PROPERTY_NAME_NAME] := ASourceRole.Name;
   Result := TComAdminRole.Create(Self, LRole);
   Result.CopyProperties(ASourceRole);
-  Assert(Assigned(Catalog), 'Invalid catalog');
   Catalog.ChangeCount := Catalog.ChangeCount + SaveChanges;
   Self.Add(Result);
 end;
@@ -1724,32 +1819,38 @@ begin
     raise Exception.Create(ERROR_COPY_LIBRARY);
 end;
 
-function TCOMAdminComponentList.BuildTargetLibraryName(ASourceComponent: TCOMAdminComponent): string;
+function TCOMAdminComponentList.BuildLibraryName(AComponent: TCOMAdminComponent): string;
 begin
-  if Catalog.LibraryPath.IsEmpty then
+  if AComponent.Collection.Catalog.LibraryPath.IsEmpty then
     raise Exception.CreateFmt(ERROR_INVALID_LIBRARY_PATH, [Catalog.Server]);
-  if Catalog.Server.IsEmpty then
-    Result := Format('%s', [TPath.Combine(Catalog.LibraryPath, ExtractFileName(ASourceComponent.Dll))])
+  if AComponent.Collection.Catalog.Server.IsEmpty or AComponent.Collection.Catalog.IsLocalComputer then
+    Result := Format('%s', [TPath.Combine(AComponent.Collection.Catalog.LibraryPath, ExtractFileName(AComponent.Dll))])
   else
-    Result := Format('\\%s\%s', [Catalog.Server, TPath.Combine(Catalog.LibraryPath, ExtractFileName(ASourceComponent.Dll)).Replace(':','$')]);
+    Result := Format('\\%s\%s', [AComponent.Collection.Catalog.Server, TPath.Combine(AComponent.Collection.Catalog.LibraryPath, ExtractFileName(AComponent.Dll)).Replace(':','$')]);
 end;
 
 function TCOMAdminComponentList.CopyLibrary(ASourceComponent: TCOMAdminComponent; AOverwrite: Boolean): Boolean;
 var
-  LTargetLibrary: string;
+  LSourceLibrary, LTargetLibrary: string;
 begin
-  LTargetLibrary := BuildTargetLibraryName(ASourceComponent);
+  LTargetLibrary := BuildLibraryName(ASourceComponent);
   if AOverwrite or not FileExists(LTargetLibrary) then
   try
-    if (Owner as TComAdminApplication).Instances.Count > 0 then
-    begin
-      Catalog.Catalog.ShutdownApplication(Owner.Key);
-      if (Owner as TComAdminApplication).Instances.Count = 0 then
-        TFile.Copy(ASourceComponent.Dll, LTargetLibrary, AOverwrite)
-      else
-        raise Exception.Create(ERROR_APPLICATION_NOT_DOWN);
-    end else
-      TFile.Copy(ASourceComponent.Dll, LTargetLibrary, AOverwrite);
+    (Owner as TComAdminApplication).SetApplicationEnabled(False); // disable application to prevent new instances
+    try
+      LSourceLibrary := BuildLibraryName(ASourceComponent);
+      if (Owner as TComAdminApplication).Instances.Count > 0 then
+      begin
+        Catalog.Catalog.ShutdownApplication(Owner.Key);
+        if (Owner as TComAdminApplication).Instances.Count = 0 then
+          TFile.Copy(LSourceLibrary, LTargetLibrary, AOverwrite)
+        else
+          raise Exception.Create(ERROR_APPLICATION_NOT_DOWN);
+      end else
+        TFile.Copy(LSourceLibrary, LTargetLibrary, AOverwrite);
+    finally
+      (Owner as TComAdminApplication).SetApplicationEnabled(True); // re-enable application
+    end;
     Owner.Collection.Catalog.DebugMessage(DEBUG_MESSAGE_COPY_LIBRARY, [LTargetLibrary]);
   except
     on E:Exception do
@@ -1791,7 +1892,9 @@ function TComAdminApplication.CopyProperties(ASourceApplication: TCOMAdminApplic
 begin
 
   inherited CopyProperties(ASourceApplication, Self);
-  Password := APassword;
+
+  if not APassword.IsEmpty then
+    Password := APassword;
 
   // Changes must be saved before any sub-collections can be updated
   Result := Collection.SaveChanges;
@@ -1878,6 +1981,7 @@ end;
 function TComAdminApplication.InstallComponent(const ALibraryName: string): TCOMAdminComponent;
 begin
   try
+    Collection.Catalog.DebugMessage(DEBUG_MESSAGE_INSTALL_COMPONENT, [Name, ExtractFileName(ALibraryName)]);
     Collection.Catalog.Catalog.InstallComponent(Name, ALibraryName, '', '');
     FComponents.CatalogCollection.Populate; // muste be populated to retrieve the newly installed component
     FComponents.Add(TCOMAdminComponent.Create(FComponents, (FComponents.CatalogCollection.Item[FComponents.CatalogCollection.Count - 1]) as ICatalogObject));
@@ -1983,6 +2087,15 @@ begin
   FActivation := Value;
   if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_ACTIVATION) then
     CatalogObject.Value[PROPERTY_NAME_ACTIVATION] := Value;
+end;
+
+procedure TComAdminApplication.SetApplicationEnabled(AValue: Boolean);
+begin
+  if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_IS_ENABLED) then
+  begin
+    CatalogObject.Value[PROPERTY_NAME_IS_ENABLED] := AValue;
+    CatalogCollection.SaveChanges;
+  end;
 end;
 
 procedure TComAdminApplication.SetAuthenticationCapability(const Value: TCOMAdminAuthenticationCapability);
@@ -2412,8 +2525,10 @@ end;
 
 { TComAdminComputer }
 
-constructor TComAdminComputer.Create(ACatalogCollection: ICatalogCollection);
+constructor TComAdminComputer.Create(AOwner: TComAdminCatalog; ACatalogCollection: ICatalogCollection);
 begin
+  FOwner := AOwner;
+  FCollection := ACatalogCollection;
   ACatalogCollection.Populate;
   inherited Create(nil, ACatalogCollection.Item[0] as ICatalogObject);
   ReadExtendedProperties;
@@ -2432,7 +2547,7 @@ begin
   FInternetPortsListed := VarAsType(CatalogObject.Value[PROPERTY_NAME_INTERNET_PORTS], varBoolean);
   FIsRouter := VarAsType(CatalogObject.Value[PROPERTY_NAME_IS_ROUTER], varBoolean);
   FLoadBalancingCLSID := VarToStr(CatalogObject.Value[PROPERTY_NAME_LOAD_BALANCING_ID]);
-  FLocalPartitionLookupEnabled := VarAsType(CatalogObject.Value[PROPERTY_NAME_IS_ROUTER], varBoolean);
+  FLocalPartitionLookupEnabled := VarAsType(CatalogObject.Value[PROPERTY_NAME_PARTITION_LOOKUP], varBoolean);
   FOperatingSystem := VarAsType(CatalogObject.Value[PROPERTY_NAME_OPERATING_SYSTEM], varLongWord);
   FPartitionsEnabled := VarAsType(CatalogObject.Value[PROPERTY_NAME_PARTITIONS_ENABLED], varBoolean);
   FPorts := VarToStr(CatalogObject.Value[PROPERTY_NAME_PORTS]);
@@ -2446,6 +2561,149 @@ begin
   FTransactionTimeout := VarAsType(CatalogObject.Value[PROPERTY_NAME_TRANSACTION_TIMEOUT], varLongWord);
 end;
 
+procedure TComAdminComputer.SetApplicationProxyRSN(const Value: string);
+begin
+  FApplicationProxyRSN := Value;
+  if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_PROXY_RSN) then
+    CatalogObject.Value[PROPERTY_NAME_PROXY_RSN] := Value;
+end;
+
+procedure TComAdminComputer.SetAuthenticationLevel(const Value: TCOMAdminAuthenticationLevel);
+begin
+  FAuthenticationLevel := Value;
+  if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_DEFAULT_AUTHENTICATION) then
+    CatalogObject.Value[PROPERTY_NAME_DEFAULT_AUTHENTICATION] := Value;
+end;
+
+procedure TComAdminComputer.SetCISEnabled(const Value: Boolean);
+begin
+  FCISEnabled := Value;
+  if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_CIS_ENABLED) then
+    CatalogObject.Value[PROPERTY_NAME_CIS_ENABLED] := Value;
+end;
+
+procedure TComAdminComputer.SetDCOMEnabled(const Value: Boolean);
+begin
+  FDCOMEnabled := Value;
+  if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_DCOM_ENABLED) then
+    CatalogObject.Value[PROPERTY_NAME_DCOM_ENABLED] := Value;
+end;
+
+procedure TComAdminComputer.SetDefaultToInternetPorts(const Value: Boolean);
+begin
+  FDefaultToInternetPorts := Value;
+  if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_DEFAULT_TO_INTERNET) then
+    CatalogObject.Value[PROPERTY_NAME_DEFAULT_TO_INTERNET] := Value;
+end;
+
+procedure TComAdminComputer.SetDescription(const Value: string);
+begin
+  FDescription := Value;
+  if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_DESCRIPTION) then
+    CatalogObject.Value[PROPERTY_NAME_DESCRIPTION] := Value;
+end;
+
+procedure TComAdminComputer.SetDSPartitionLookupEnabled(const Value: Boolean);
+begin
+  FDSPartitionLookupEnabled := Value;
+  if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_DS_PARTITION_LOOKUP) then
+    CatalogObject.Value[PROPERTY_NAME_DS_PARTITION_LOOKUP] := Value;
+end;
+
+procedure TComAdminComputer.SetImpersonationLevel(const Value: TCOMAdminImpersonationLevel);
+begin
+  FImpersonationLevel := Value;
+  if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_DEFAULT_IMPERSONATION) then
+    CatalogObject.Value[PROPERTY_NAME_DEFAULT_IMPERSONATION] := Value;
+end;
+
+procedure TComAdminComputer.SetInternetPortsListed(const Value: Boolean);
+begin
+  FInternetPortsListed := Value;
+  if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_INTERNET_PORTS) then
+    CatalogObject.Value[PROPERTY_NAME_INTERNET_PORTS] := Value;
+end;
+
+procedure TComAdminComputer.SetIsRouter(const Value: Boolean);
+begin
+  FIsRouter := Value;
+  if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_IS_ROUTER) then
+    CatalogObject.Value[PROPERTY_NAME_IS_ROUTER] := Value;
+end;
+
+procedure TComAdminComputer.SetLoadBalancingCLSID(const Value: string);
+begin
+  FLoadBalancingCLSID := Value;
+end;
+
+procedure TComAdminComputer.SetLocalPartitionLookupEnabled(const Value: Boolean);
+begin
+  FLocalPartitionLookupEnabled := Value;
+  if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_PARTITION_LOOKUP) then
+    CatalogObject.Value[PROPERTY_NAME_PARTITION_LOOKUP] := Value;
+end;
+
+procedure TComAdminComputer.SetOperatingSystem(const Value: TCOMAdminOperatingSystem);
+begin
+  FOperatingSystem := Value;
+  if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_OPERATING_SYSTEM) then
+    CatalogObject.Value[PROPERTY_NAME_OPERATING_SYSTEM] := Value;
+end;
+
+procedure TComAdminComputer.SetPartitionsEnabled(const Value: Boolean);
+begin
+  FPartitionsEnabled := Value;
+  if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_PARTITIONS_ENABLED) then
+    CatalogObject.Value[PROPERTY_NAME_PARTITIONS_ENABLED] := Value;
+end;
+
+procedure TComAdminComputer.SetPorts(const Value: string);
+begin
+  FPorts := Value;
+  if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_PORTS) then
+    CatalogObject.Value[PROPERTY_NAME_PORTS] := Value;
+end;
+
+procedure TComAdminComputer.SetResourcePoolingEnabled(const Value: Boolean);
+begin
+  FResourcePoolingEnabled := Value;
+  if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_RESOURCE_POOLING) then
+    CatalogObject.Value[PROPERTY_NAME_RESOURCE_POOLING] := Value;
+end;
+
+procedure TComAdminComputer.SetRPCProxyEnabled(const Value: Boolean);
+begin
+  FRPCProxyEnabled := Value;
+end;
+
+procedure TComAdminComputer.SetSecureReferencesEnabled(const Value: Boolean);
+begin
+  FSecureReferencesEnabled := Value;
+  if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_SECURE_REFERENCES) then
+    CatalogObject.Value[PROPERTY_NAME_SECURE_REFERENCES] := Value;
+end;
+
+procedure TComAdminComputer.SetSecurityTrackingEnabled(const Value: Boolean);
+begin
+  FSecurityTrackingEnabled := Value;
+  if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_SECURE_TRACKING) then
+    CatalogObject.Value[PROPERTY_NAME_SECURE_TRACKING] := Value;
+end;
+
+procedure TComAdminComputer.SetSRPActivateAsActivatorChecks(const Value: Boolean);
+begin
+  FSRPActivateAsActivatorChecks := Value;
+  if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_SRP_ACTIVATE_CHECKS) then
+    CatalogObject.Value[PROPERTY_NAME_SRP_ACTIVATE_CHECKS] := Value;
+end;
+
+procedure TComAdminComputer.SetSRPRunningObjectChecks(const Value: Boolean);
+begin
+  FSRPRunningObjectChecks := Value;
+  if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_SRP_OBJECTS_CHECK) then
+    CatalogObject.Value[PROPERTY_NAME_SRP_OBJECTS_CHECK] := Value;
+end;
+
 procedure TComAdminComputer.SetTransactionTimeout(const Value: Cardinal);
 begin
   if InternalCheckRange(1, MAX_TIMEOUT, Value) then
@@ -2454,6 +2712,13 @@ begin
     if not CatalogObject.IsPropertyReadOnly(PROPERTY_NAME_TRANSACTION_TIMEOUT) then
       CatalogObject.Value[PROPERTY_NAME_TRANSACTION_TIMEOUT] := Value;
   end;
+end;
+
+procedure TComAdminComputer.SyncFromServer(ASourceComputer: TComAdminComputer);
+begin
+  FOwner.DebugMessage(DEBUG_MESSAGE_SYNC_COMPUTER, [ASourceComputer.Owner.Server, FOwner.Server]);
+  inherited CopyProperties(ASourceComputer, Self);
+  FCollection.SaveChanges;
 end;
 
 { TComAdminDCOMProtocol }
@@ -2723,9 +2988,17 @@ begin
   Result := inherited Items[Index] as TComAdminTransientSubscription;
 end;
 
+{ TPasswordList }
+
+destructor TPasswordList.Destroy;
+begin
+  Clear;
+  inherited;
+end;
+
 { TComAdminCatalog }
 
-constructor TComAdminCatalog.Create(const AServer, AFilter: string; AOnReadEvent: TComAdminReadEvent);
+constructor TComAdminCatalog.Create(const AServer: string; const AFilter: string; AOnReadEvent: TComAdminReadEvent; AOnDebug: TComAdminDebug);
 begin
   inherited Create;
 
@@ -2735,51 +3008,98 @@ begin
   FServer := AServer;
 
   FOnReadObject := AOnReadEvent;
+  FOnDebug := AOnDebug;
 
   // Only call connect if the given server is not the local computer
   if not AServer.IsEmpty and not AServer.ToLower.Equals(GetLocalComputerName.ToLower) then
-    FCatalog.Connect(AServer);
+    FCatalog.Connect(AServer)
+  else
+    FServer := GetLocalComputerName.ToLower;
 
   if AFilter.IsEmpty then
     FFilter := DEFAULT_APP_FILTER
   else
     FFilter := AFilter;
 
+  DebugMessage(DEBUG_MESSAGE_READ_CATALOG, [FServer]);
+
   FAvailableCollections := TComAdminAvailableCollections.Create(FCatalog);
 
-  FApplicationCluster := TComAdminApplicationCluster.Create(nil, Self, FCatalog.GetCollection(COLLECTION_NAME_APPLICATION_CLUSTER) as ICatalogCollection);
-  FApplications := TComAdminApplicationList.Create(nil, Self, FCatalog.GetCollection(COLLECTION_NAME_APPS) as ICatalogCollection);
-  FComputer := TComAdminComputer.Create(FCatalog.GetCollection(COLLECTION_NAME_COMPUTER) as ICatalogCollection);
-  FEventClasses := TComAdminEventClassList.Create(nil, Self, FCatalog.GetCollection(COLLECTION_NAME_EVENT_CLASSES) as ICatalogCollection);
-  FInprocServers := TComAdminInprocServerList.Create(nil, Self, FCatalog.GetCollection(COLLECTION_NAME_INPROC_SERVERS) as ICatalogCollection);
-  FPartitions := TComAdminPartitionList.Create(nil, Self, FCatalog.GetCollection(COLLECTION_NAME_PARTITIONS) as ICatalogCollection);
-  FProtocols := TComAdminDCOMProtocolList.Create(nil, Self, FCatalog.GetCollection(COLLECTION_NAME_DCOM_PROTOCOLS) as ICatalogCollection);
-  FTransientSubscriptions := TComAdminTransientSubscriptionList.Create(nil, Self, FCatalog.GetCollection(COLLECTION_NAME_TRANSIENT_SUBSCRIPTION) as ICatalogCollection);
+  if CATALOG_READ_APPLICATION_CLUSTERS then
+  begin
+    FApplicationCluster := TComAdminApplicationCluster.Create(nil, Self, FCatalog.GetCollection(COLLECTION_NAME_APPLICATION_CLUSTER) as ICatalogCollection);
+    GetServers;
+  end;
 
-  if CATALOG_READ_APPLICATIONS then GetApplications;
-  if CATALOG_READ_EVENT_CLASSES then GetEventClasses;
-  if CATALOG_READ_INPROC_SERVERS then GetInprocServers;
-  if CATALOG_READ_PARTITIONS then GetPartitions;
-  if CATALOG_READ_PROTOCOLS then GetProtocols;
-  if CATALOG_READ_APPLICATION_CLUSTERS then GetServers;
-  if CATALOG_READ_TRANSIENT_SUBSCRIPTIONS then GetTransientSubscription;
+  if CATALOG_READ_APPLICATIONS then
+  begin
+    FApplications := TComAdminApplicationList.Create(nil, Self, FCatalog.GetCollection(COLLECTION_NAME_APPS) as ICatalogCollection);
+    GetApplications;
+  end;
+
+  if CATALOG_READ_COMPUTER then
+    FComputer := TComAdminComputer.Create(Self, FCatalog.GetCollection(COLLECTION_NAME_COMPUTER) as ICatalogCollection);
+
+  if CATALOG_READ_EVENT_CLASSES then
+  begin
+    FEventClasses := TComAdminEventClassList.Create(nil, Self, FCatalog.GetCollection(COLLECTION_NAME_EVENT_CLASSES) as ICatalogCollection);
+    GetEventClasses;
+  end;
+
+  if CATALOG_READ_INPROC_SERVERS then
+  begin
+    FInprocServers := TComAdminInprocServerList.Create(nil, Self, FCatalog.GetCollection(COLLECTION_NAME_INPROC_SERVERS) as ICatalogCollection);
+    GetInprocServers;
+  end;
+
+  if CATALOG_READ_PARTITIONS then
+  begin
+    FPartitions := TComAdminPartitionList.Create(nil, Self, FCatalog.GetCollection(COLLECTION_NAME_PARTITIONS) as ICatalogCollection);
+    GetPartitions;
+  end;
+
+  if CATALOG_READ_PROTOCOLS then
+  begin
+    FProtocols := TComAdminDCOMProtocolList.Create(nil, Self, FCatalog.GetCollection(COLLECTION_NAME_DCOM_PROTOCOLS) as ICatalogCollection);
+    GetProtocols;
+  end;
+
+  if CATALOG_READ_TRANSIENT_SUBSCRIPTIONS then
+  begin
+    FTransientSubscriptions := TComAdminTransientSubscriptionList.Create(nil, Self, FCatalog.GetCollection(COLLECTION_NAME_TRANSIENT_SUBSCRIPTION) as ICatalogCollection);
+    GetTransientSubscription;
+  end;
+
 
 end;
 
 destructor TComAdminCatalog.Destroy;
 begin
-  FApplicationCluster.Free;
-  FApplications.Free;
-  FAvailableCollections.Free;
-  FComputer.Free;
-  FCopiedLibraries.Free;
-  FEventClasses.Free;
-  FInprocServers.Free;
-  FPartitions.Free;
-  FPasswords.Clear;
-  FPasswords.Free;
-  FProtocols.Free;
-  FTransientSubscriptions.Free;
+  if Assigned(FApplicationCluster) then
+    FApplicationCluster.Free;
+  if Assigned(FApplications) then
+    FApplications.Free;
+  if Assigned(FAvailableCollections) then
+    FAvailableCollections.Free;
+  if Assigned(FComputer) then
+    FComputer.Free;
+  if Assigned(FCopiedLibraries) then
+    FCopiedLibraries.Free;
+  if Assigned(FEventClasses) then
+    FEventClasses.Free;
+  if Assigned(FInprocServers) then
+    FInprocServers.Free;
+  if Assigned(FPartitions) then
+    FPartitions.Free;
+  if Assigned(FPasswords) then
+  begin
+    FPasswords.Clear;
+    FPasswords.Free;
+  end;
+  if Assigned(FProtocols) then
+    FProtocols.Free;
+  if Assigned(FTransientSubscriptions) then
+    FTransientSubscriptions.Free;
   inherited;
 end;
 
@@ -2899,6 +3219,11 @@ begin
     FTransientSubscriptions.Add(TComAdminTransientSubscription.Create(FTransientSubscriptions, FTransientSubscriptions.CatalogCollection.Item[i] as ICatalogObject));
 end;
 
+function TComAdminCatalog.IsLocalComputer: Boolean;
+begin
+  Result := FServer.ToLower.Equals(GetLocalComputerName.ToLower);
+end;
+
 function TComAdminCatalog.GetLocalComputerName: string;
 var
   BufferSize: Cardinal;
@@ -2922,15 +3247,14 @@ begin
   end;
 end;
 
-function TComAdminCatalog.SyncToServer(const ATargetServer, ACreatorString: string): Integer;
+function TComAdminCatalog.SyncToServer(const ATargetServer, ACreatorString: string; ASyncComputers: Boolean): Integer;
 var
   LTargetServerCatalog: TComAdminCatalog;
   LApplication: TComAdminApplication;
   LPassword: string;
   i: Integer;
 begin
-  DebugMessage(DEBUG_MESSAGE_START_SYNC, [FServer, ATargetServer]);
-  LTargetServerCatalog := TComAdminCatalog.Create(ATargetServer, FFilter, FOnReadObject);
+  LTargetServerCatalog := TComAdminCatalog.Create(ATargetServer, FFilter, FOnReadObject, FOnDebug);
   try
     FCopiedLibraries.Clear;
     LTargetServerCatalog.ChangeCount := 0;
@@ -2938,25 +3262,35 @@ begin
     LTargetServerCatalog.LibraryPath := FLibraryPath;
     LTargetServerCatalog.OnDebug := FOnDebug;
 
+    DebugMessage(DEBUG_MESSAGE_START_SYNC, [FServer, LTargetServerCatalog.Server]);
+
+    // sync settings of the local computer
+    if ASyncComputers then
+      LTargetServerCatalog.Computer.SyncFromServer(FComputer);
+
     // sync applications from main server to target server
     for i := 0 to FApplications.Count - 1 do
     begin
-      DebugMessage(DEBUG_MESSAGE_SYNC_APPLICATION, [FApplications[i].Name]);
+      if FApplications[i].IsSystem then
+        DebugMessage(DEBUG_MESSAGE_SYNC_SYSTEM_APPLICATION, [FApplications[i].Name])
+      else begin
+        DebugMessage(DEBUG_MESSAGE_SYNC_APPLICATION, [FApplications[i].Name]);
 
-      if not FApplications[i].IsIntegratedIdentity then
-      begin
-        LPassword := GetPasswordForIdentity(FApplications[i].Identity);
-        DebugMessage(DEBUG_MESSAGE_GET_PASSWORD, [FApplications[i].Identity]);
+        if not FApplications[i].IsIntegratedIdentity then
+        begin
+          LPassword := GetPasswordForIdentity(FApplications[i].Identity);
+          DebugMessage(DEBUG_MESSAGE_GET_PASSWORD, [FApplications[i].Identity]);
+        end;
+
+        if LTargetServerCatalog.Applications.Find(FApplications[i].Name, LApplication) then
+        begin
+          LTargetServerCatalog.Catalog.ShutdownApplication(LApplication.Key);
+          LApplication.CopyProperties(FApplications[i], LPassword); // Application exists on target server ==> copy properties
+          if not ACreatorString.IsEmpty then
+            LApplication.CreatedBy := ACreatorString;
+        end else
+          LTargetServerCatalog.Applications.Append(FApplications[i], ACreatorString, LPassword); // Application does not exists on target server ==> create & copy
       end;
-
-      if LTargetServerCatalog.Applications.Find(FApplications[i].Name, LApplication) then
-      begin
-        LTargetServerCatalog.Catalog.ShutdownApplication(LApplication.Key);
-        LApplication.CopyProperties(FApplications[i], LPassword); // Application exists on target server ==> copy properties
-        if not ACreatorString.IsEmpty then
-          LApplication.CreatedBy := ACreatorString;
-      end else
-        LTargetServerCatalog.Applications.Append(FApplications[i], ACreatorString, LPassword); // Application does not exists on target server ==> create & copy
     end;
 
     // delete all applications on target server that not exists on main server
