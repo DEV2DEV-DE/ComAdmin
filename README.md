@@ -14,7 +14,7 @@ var
   ComCatalog: TComAdminCatalog;
   i: Integer;
 begin
-  ComCatalog := TComAdminCatalog.Create('MyServerName', '*', nil);
+  ComCatalog := TComAdminCatalog.Create('MyServerName', '*', nil, nil);
   try
     for i := 0 to ComCatalog.Applications.Count - 1 do
       Memo1.Lines.Add(ComCatalog.Applications[i].Name);
