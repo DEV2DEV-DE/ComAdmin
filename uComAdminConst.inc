@@ -1,25 +1,31 @@
 const
   CATALOG_READ_APPLICATIONS: Boolean = True;
   CATALOG_READ_APPLICATION_CLUSTERS: Boolean = True;
+  CATALOG_READ_COMPUTER: Boolean = True;
   CATALOG_READ_EVENT_CLASSES: Boolean = True;
   CATALOG_READ_INPROC_SERVERS: Boolean = False;
   CATALOG_READ_PARTITIONS: Boolean = True;
   CATALOG_READ_PROTOCOLS: Boolean = True;
-  CATALOG_READ_TRANSIENT_SUBSCRIPTIONS: Boolean = True;
+  CATALOG_READ_TRANSIENT_SUBSCRIPTIONS: Boolean = False;
 
   DEBUG_MESSAGE_ADD_ROLE_ERROR = '[COMAdmin] Could not append role ''%s'' to object ''%s''';
   DEBUG_MESSAGE_COPY_ERROR = '[COMAdmin] Copy library %s failed: %s';
   DEBUG_MESSAGE_COPY_LIBRARY = '[COMAdmin] Copy library %s';
+  DEBUG_MESSAGE_COPY_ROLE_PROPERTIES = '[COMAdmin] Error in TComAdminRole.CopyProperties: %s';
   DEBUG_MESSAGE_DELETE_ROLE = '[COMAdmin] Deleting role %s from application %s on server %s';
   DEBUG_MESSAGE_GET_PASSWORD = '[COMAdmin] Using password for identity ''%s''';
+  DEBUG_MESSAGE_INSTALL_COMPONENT = '[COMAdmin] Installing component ''%s'' from library ''%s''';
+  DEBUG_MESSAGE_READ_CATALOG = '[COMAdmin] Read catalog from server ''%s''';
   DEBUG_MESSAGE_SET_PROPERTY = '[COMAdmin] Setting property ''%s'' to value ''%s''';
   DEBUG_MESSAGE_SET_PROPERTY_ERROR = '[COMAdmin] Error setting property: %s';
   DEBUG_MESSAGE_START_SYNC = '[COMAdmin] Synchronizing servers from ''%s'' to ''%s''';
   DEBUG_MESSAGE_SYNC_APPLICATION = '[COMAdmin] Synchronizing COM-Application ''%s''';
   DEBUG_MESSAGE_SYNC_COMPLETED = '[COMAdmin] Synchronizing successfully completed';
   DEBUG_MESSAGE_SYNC_COMPONENT = '[COMAdmin] Synchronizing component ''%s''';
+  DEBUG_MESSAGE_SYNC_COMPUTER = '[COMAdmin] Synchronizing computer settings from ''%s'' to ''%s''';
   DEBUG_MESSAGE_SYNC_ROLE = '[COMAdmin] Synchronizing role ''%s''';
   DEBUG_MESSAGE_SYNC_USER = '[COMAdmin] Synchronizing user ''%s''';
+  DEBUG_MESSAGE_SYNC_SYSTEM_APPLICATION = '[COMAdmin] System application ''%s'' will not be synchronized';
 
   DEFAULT_APP_FILTER = '*';
 
