@@ -1234,7 +1234,7 @@ begin
   begin
     Collection.Catalog.DebugMessage(DEBUG_MESSAGE_SYNC_USER, [ASourceRole.Users[i].Name]);
     if not FUsers.Contains(ASourceRole.Users[i].Name) then
-      FUsers.Append(ASourceRole.Users[i]); // User does not exists in target role ==> create & copy
+      FUsers.Append(ASourceRole.Users[i]); // User does not exist in target role ==> create & copy
   end;
 end;
 
@@ -1793,9 +1793,9 @@ begin
     if FRoles.Find(ASourceComponent.Roles[i].Name, LRole) then
       LRole.CopyProperties(ASourceComponent.Roles[i])
     else
-      FRoles.Append(ASourceComponent.Roles[i]); // Role does not exists in target component ==> create & copy
+      FRoles.Append(ASourceComponent.Roles[i]); // Role does not exist in target component ==> create & copy
   end;
-  // delete all roles in target component that not exists in source component
+  // delete all roles in target component that do not exist in source component
   for i := ASourceComponent.Roles.Count - 1 downto 0 do
   begin
     if not ASourceComponent.Roles.Contains(ASourceComponent.Roles[i].Name) then
