@@ -1,6 +1,10 @@
 ﻿# ComAdmin
+[![GitHub license](https://img.shields.io/github/license/DEV2DEV-DE/ComAdmin)](https://github.com/DEV2DEV-DE/ComAdmin/blob/main/LICENSE)
 ![](https://tokei.rs/b1/github/DEV2DEV-DE/ComAdmin?category=code)
-![](https://tokei.rs/b1/github/DEV2DEV-DE/ComAdmin?category=files)
+![GitHub repo size](https://img.shields.io/github/repo-size/DEV2DEV-DE/ComAdmin)
+![GitHub commit activity](https://img.shields.io/github/commit-activity/m/DEV2DEV-DE/ComAdmin)
+![GitHub last commit](https://img.shields.io/github/last-commit/DEV2DEV-DE/ComAdmin)
+![GitHub issues](https://img.shields.io/github/issues/DEV2DEV-DE/ComAdmin)
 
 Delphi wrapper for the COM+ administration for Windows
 
